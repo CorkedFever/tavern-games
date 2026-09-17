@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc.Testing;
+using TavernGames.Core.Games.LiarsDice;
 using TavernGames.Core.Protocol;
 
 namespace TavernGames.Server.Tests;
@@ -27,7 +28,7 @@ public class BotGameTests : IClassFixture<WebApplicationFactory<Program>>
     {
         await using var me = await ConnectAsync();
 
-        await me.SendAsync(new CreateRoom("Me", StartingDice: 2));
+        await me.SendAsync(new CreateRoom("Me", LiarsDiceModule.Type, new() { ["startingDice"] = 2 }));
         var id = await me.ReceiveUntilAsync<Identity>();
 
         // Fill the table with two bots, then start.

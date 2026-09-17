@@ -1,4 +1,5 @@
 using TavernGames.Core;
+using TavernGames.Core.Games.LiarsDice;
 
 namespace TavernGames.Core.Tests;
 
@@ -54,7 +55,7 @@ public class BotStrategyTests
         for (var trial = 0; trial < 50; trial++)
         {
             var game = Game(new RandomDiceRoller(trial), dice: 3);
-            for (var step = 0; step < 20 && game.Phase == GamePhase.Bidding; step++)
+            for (var step = 0; step < 20 && game.Phase == GamePhase.Playing; step++)
             {
                 var actor = game.Current;
                 var decision = BotStrategy.Decide(game, actor, rng);

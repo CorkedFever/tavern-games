@@ -14,7 +14,7 @@ var app = builder.Build();
 
 app.UseWebSockets();
 
-app.MapGet("/", () => "Liar's Dice relay server. Connect a WebSocket to /ws.");
+app.MapGet("/", () => "Tavern Games relay server. Connect a WebSocket to /ws.");
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
 app.Map("/ws", async (HttpContext ctx, RoomManager rooms, ILoggerFactory logFactory) =>
@@ -50,7 +50,7 @@ app.Map("/ws", async (HttpContext ctx, RoomManager rooms, ILoggerFactory logFact
                 case CreateRoom create when room is null:
                     try
                     {
-                        room = rooms.Create(NormalizeDice(create.StartingDice), Math.Clamp(create.TurnDelayMs, 0, 5000));
+                        room = rooms.Create(create.GameType, create.Options, Math.Clamp(create.TurnDelayMs, 0, 5000));
                         conn.RoomCode = room.Code;
                         await room.AddPlayerAsync(conn, Sanitize(create.PlayerName));
                     }
@@ -132,8 +132,6 @@ static async Task LeaveAsync(RoomManager rooms, GameRoom room, ClientConnection 
     await room.RemoveConnectionAsync(conn.PlayerId);
     if (room.IsEmpty) rooms.Remove(room.Code);
 }
-
-static int NormalizeDice(int requested) => Math.Clamp(requested, 1, 6);
 
 static string Sanitize(string? name)
 {

@@ -1,4 +1,4 @@
-namespace TavernGames.Core;
+namespace TavernGames.Core.Games.LiarsDice;
 
 /// <summary>
 /// A bid claims that at least <see cref="Quantity"/> dice showing

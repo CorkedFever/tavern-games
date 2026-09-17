@@ -1,11 +1,4 @@
-namespace TavernGames.Core;
-
-public enum GamePhase
-{
-    Lobby,
-    Bidding,
-    GameOver
-}
+namespace TavernGames.Core.Games.LiarsDice;
 
 /// <summary>The outcome of a resolved challenge, including the revealed hands.</summary>
 public sealed record ChallengeOutcome(

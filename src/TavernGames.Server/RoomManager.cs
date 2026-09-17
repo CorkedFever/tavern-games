@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using TavernGames.Core.Platform;
 
 namespace TavernGames.Server;
 
@@ -15,7 +16,7 @@ public sealed class RoomManager
 
     public int RoomCount => _rooms.Count;
 
-    public GameRoom Create(int startingDice, int turnDelayMs)
+    public GameRoom Create(string gameType, IReadOnlyDictionary<string, int>? options, int turnDelayMs)
     {
         if (_rooms.Count >= _maxRooms)
             throw new InvalidOperationException("The server is at capacity — please try again later.");
@@ -23,7 +24,7 @@ public sealed class RoomManager
         for (var attempt = 0; attempt < 10; attempt++)
         {
             var code = NewCode();
-            var room = new GameRoom(code, startingDice, turnDelayMs);
+            var room = new GameRoom(code, GameCatalog.Create(gameType, options), turnDelayMs);
             if (_rooms.TryAdd(code, room))
                 return room;
         }

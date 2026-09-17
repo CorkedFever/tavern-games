@@ -2,10 +2,16 @@ using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
 using TavernGames.Core;
+using TavernGames.Core.Platform;
 using TavernGames.Core.Protocol;
 
 namespace TavernGames.Plugin.Windows;
 
+/// <summary>
+/// The shell every game shares: connect, pick a game and open or join a room, the
+/// room lobby, game over, and the log. While a game is being played the active
+/// <see cref="Game.IClientGame"/> draws the table.
+/// </summary>
 public sealed class MainWindow : Window
 {
     private readonly Plugin _plugin;
@@ -13,18 +19,16 @@ public sealed class MainWindow : Window
     // Form fields persisted across frames.
     private string _serverUrl;
     private string _playerName;
-    private int _startingDice;
+    private string _gameType;
     private float _turnDelaySec;
     private string _joinCode = "";
-    private int _bidQuantity = 1;
-    private int _bidFace = 2;
 
     public MainWindow(Plugin plugin) : base("Tavern Games##TavernGamesMain")
     {
         _plugin = plugin;
         _serverUrl = plugin.Config.ServerUrl;
         _playerName = plugin.Config.PlayerName;
-        _startingDice = plugin.Config.StartingDice;
+        _gameType = GameCatalog.Find(plugin.Config.LastGameType)?.Type ?? GameCatalog.Games[0].Type;
         _turnDelaySec = plugin.Config.TurnDelayMs / 1000f;
 
         SizeConstraints = new WindowSizeConstraints
@@ -48,7 +52,7 @@ public sealed class MainWindow : Window
         catch (Exception ex)
         {
             Plugin.Log.Error(ex, "Tavern Games: UI draw error.");
-            ImGui.TextColored(new Vector4(1f, 0.4f, 0.4f, 1f), "A UI error occurred — see /xllog for details.");
+            ImGui.TextColored(TableUi.Red, "A UI error occurred. See /xllog for details.");
         }
     }
 
@@ -66,14 +70,28 @@ public sealed class MainWindow : Window
         }
         else
         {
-            if (Session.IsSpectator)
-                ImGui.TextColored(new Vector4(0.5f, 0.9f, 1f, 1f), "Spectating — watching only");
+            DrawRoomHeader();
 
             switch (Session.Phase)
             {
-                case GamePhase.Lobby: DrawRoomLobby(); break;
-                case GamePhase.Bidding: DrawGame(); break;
-                case GamePhase.GameOver: DrawGameOver(); break;
+                case GamePhase.Lobby:
+                    DrawRoomLobby();
+                    break;
+                case GamePhase.Playing when Session.ActiveGame is { } game:
+                    game.DrawTable(Session, Client.Send);
+                    break;
+                case GamePhase.Playing:
+                    ImGui.TextColored(TableUi.Red, $"This plugin version doesn't know the game '{Session.GameType}'. Update to play it.");
+                    break;
+                case GamePhase.GameOver:
+                    DrawGameOver();
+                    break;
+            }
+
+            if (Session.Phase != GamePhase.Lobby)
+            {
+                ImGui.Spacing();
+                if (ImGui.Button(Session.IsSpectator ? "Stop watching" : "Leave")) LeaveRoom();
             }
         }
 
@@ -83,7 +101,7 @@ public sealed class MainWindow : Window
 
     private void DrawConnect()
     {
-        ImGui.TextWrapped("Connect to a Liar's Dice relay server to create or join a game.");
+        ImGui.TextWrapped("Connect to a Tavern Games server to open or join a table.");
         ImGui.Spacing();
 
         ImGui.InputText("Server", ref _serverUrl, 256);
@@ -107,7 +125,7 @@ public sealed class MainWindow : Window
         if (!string.IsNullOrEmpty(Client.LastError))
         {
             ImGui.Spacing();
-            ImGui.TextColored(new Vector4(1f, 0.4f, 0.4f, 1f), $"Error: {Client.LastError}");
+            ImGui.TextColored(TableUi.Red, $"Error: {Client.LastError}");
         }
     }
 
@@ -118,20 +136,47 @@ public sealed class MainWindow : Window
         if (ImGui.SmallButton("Disconnect")) _ = Client.DisconnectAsync();
         ImGui.Separator();
 
-        ImGui.TextUnformatted("Create a new game");
-        ImGui.SliderInt("Dice per player", ref _startingDice, 1, 6);
+        ImGui.TextUnformatted("Open a new table");
+        var game = GameCatalog.Find(_gameType) ?? GameCatalog.Games[0];
+
+        if (ImGui.BeginCombo("Game", game.DisplayName))
+        {
+            foreach (var candidate in GameCatalog.Games)
+            {
+                if (ImGui.Selectable(candidate.DisplayName, candidate.Type == game.Type))
+                    _gameType = candidate.Type;
+            }
+            ImGui.EndCombo();
+        }
+        ImGui.TextDisabled($"{game.Blurb} ({game.MinPlayers}-{game.MaxPlayers} players)");
+
+        // Each game declares its own room options; they all render as sliders.
+        foreach (var option in game.Options)
+        {
+            var key = $"{game.Type}.{option.Key}";
+            var value = _plugin.Config.GameOptions.TryGetValue(key, out var saved) ? saved : option.Default;
+            value = Math.Clamp(value, option.Min, option.Max);
+            if (ImGui.SliderInt($"{option.Label}##{key}", ref value, option.Min, option.Max))
+                _plugin.Config.GameOptions[key] = value;
+        }
+
         ImGui.SliderFloat("Game speed (sec/move)", ref _turnDelaySec, 0.5f, 3.0f, "%.1f s");
-        ImGui.TextDisabled("Higher = slower bots and a longer pause between rounds.");
+        ImGui.TextDisabled("Higher = slower bots and longer pauses between rounds.");
+
         if (ImGui.Button("Create Room"))
         {
-            _plugin.Config.StartingDice = _startingDice;
+            var options = game.Options.ToDictionary(
+                o => o.Key,
+                o => _plugin.Config.GameOptions.TryGetValue($"{game.Type}.{o.Key}", out var v) ? v : o.Default);
+
+            _plugin.Config.LastGameType = game.Type;
             _plugin.Config.TurnDelayMs = (int)(_turnDelaySec * 1000);
             _plugin.Config.Save();
-            Client.Send(new CreateRoom(_plugin.ResolvePlayerName(), _startingDice, _plugin.Config.TurnDelayMs));
+            Client.Send(new CreateRoom(_plugin.ResolvePlayerName(), game.Type, options, _plugin.Config.TurnDelayMs));
         }
 
         ImGui.Separator();
-        ImGui.TextUnformatted("Join an existing game");
+        ImGui.TextUnformatted("Join an existing table");
         ImGui.InputText("Room code", ref _joinCode, 8);
         ImGui.SameLine();
         if (ImGui.Button("Join") && _joinCode.Trim().Length > 0)
@@ -142,16 +187,32 @@ public sealed class MainWindow : Window
         ImGui.TextDisabled("Join to play, or Spectate to just watch the table.");
     }
 
+    /// <summary>Which game, which room, and whether you're only watching.</summary>
+    private void DrawRoomHeader()
+    {
+        var name = GameCatalog.Find(Session.GameType)?.DisplayName ?? Session.GameType;
+        ImGui.TextColored(TableUi.Gold, name);
+        ImGui.SameLine();
+        ImGui.TextDisabled("room");
+        ImGui.SameLine();
+        ImGui.TextColored(TableUi.Cyan, Session.RoomCode);
+        if (Session.IsSpectator)
+        {
+            ImGui.SameLine();
+            ImGui.TextColored(TableUi.Cyan, "(spectating)");
+        }
+        ImGui.Separator();
+    }
+
     private void DrawRoomLobby()
     {
-        ImGui.Text($"Room ");
-        ImGui.SameLine();
-        ImGui.TextColored(new Vector4(0.5f, 0.9f, 1f, 1f), Session.RoomCode);
-        ImGui.SameLine();
-        ImGui.TextDisabled("(share this code)");
+        var game = GameCatalog.Find(Session.GameType);
+        var minPlayers = game?.MinPlayers ?? 2;
+        var maxPlayers = game?.MaxPlayers ?? 6;
 
+        ImGui.TextDisabled("Share the room code so others can join or spectate.");
         ImGui.Spacing();
-        ImGui.TextUnformatted($"Players ({Session.Players.Count}/{LiarsDiceGame.MaxPlayers}):");
+        ImGui.TextUnformatted($"Players ({Session.Players.Count}/{maxPlayers}):");
         foreach (var p in Session.Players)
         {
             var you = p.Id == Session.MyId ? " (you)" : "";
@@ -169,146 +230,34 @@ public sealed class MainWindow : Window
         ImGui.Spacing();
         if (Session.IsHost)
         {
-            var roomFull = Session.Players.Count >= LiarsDiceGame.MaxPlayers;
-            ImGui.BeginDisabled(roomFull);
+            ImGui.BeginDisabled(Session.Players.Count >= maxPlayers);
             if (ImGui.Button("Add Bot"))
                 Client.Send(new AddBot());
             ImGui.EndDisabled();
             ImGui.SameLine();
 
-            var canStart = Session.Players.Count >= LiarsDiceGame.MinPlayers;
+            var canStart = Session.Players.Count >= minPlayers;
             ImGui.BeginDisabled(!canStart);
             if (ImGui.Button("Start Game"))
                 Client.Send(new StartGame());
             ImGui.EndDisabled();
             if (!canStart)
-                ImGui.TextDisabled($"Need at least {LiarsDiceGame.MinPlayers} players — add a bot to play solo.");
+                ImGui.TextDisabled($"Need at least {minPlayers} players. Add a bot to play solo.");
         }
         else
         {
             ImGui.TextDisabled("Waiting for the host to start...");
         }
 
-        if (ImGui.Button("Leave")) LeaveRoom();
-    }
-
-    private void DrawGame()
-    {
-        DrawRoster();
-
-        ImGui.Separator();
-
-        // Standing bid, shown as quantity × a real die face.
-        if (Session.CurrentBid is { } bid)
-        {
-            ImGui.AlignTextToFramePadding();
-            ImGui.TextUnformatted("Standing bid:");
-            ImGui.SameLine();
-            ImGui.TextColored(Gold, bid.Quantity.ToString());
-            ImGui.SameLine(0, 4);
-            ImGui.TextDisabled("×");
-            ImGui.SameLine(0, 6);
-            DiceRenderer.Die(bid.FaceValue, 22f);
-        }
-        else
-        {
-            ImGui.TextDisabled("No bid yet — the opening bid is free.");
-        }
-
-        if (!Session.IsSpectator)
-        {
-            ImGui.Spacing();
-            ImGui.AlignTextToFramePadding();
-            ImGui.TextUnformatted("Your dice:");
-            ImGui.SameLine(0, 8);
-            if (Session.MyDice.Length == 0)
-                ImGui.TextDisabled("(none)");
-            else
-                DiceRenderer.Hand(Session.MyDice, 30f);
-        }
-
-        ImGui.Separator();
-        if (Session.IsMyTurn)
-            DrawBidControls();
-        else if (!Session.IsSpectator)
-            ImGui.TextDisabled($"Waiting for {Session.NameOf(Session.CurrentPlayerId)}...");
-
-        // Calling liar is open — available any time there's a standing bid you didn't make.
-        if (Session.CanCallLiar)
-        {
-            if (ImGui.Button("Call Liar!"))
-                Client.Send(new Challenge());
-            if (!Session.IsMyTurn)
-            {
-                ImGui.SameLine();
-                ImGui.TextDisabled($"(call {Session.NameOf(Session.CurrentBidderId)}'s bluff)");
-            }
-        }
-
         if (ImGui.Button(Session.IsSpectator ? "Stop watching" : "Leave")) LeaveRoom();
-    }
-
-    private static readonly Vector4 Gold = new(1f, 0.82f, 0.32f, 1f);
-    private static readonly Vector4 TurnGreen = new(0.45f, 1f, 0.5f, 1f);
-    private static readonly Vector4 Grey = new(0.5f, 0.5f, 0.5f, 1f);
-
-    /// <summary>The table: each player, their hidden dice, and a marker for whose turn it is.</summary>
-    private void DrawRoster()
-    {
-        ImGui.TextDisabled("At the table");
-        foreach (var p in Session.Players)
-        {
-            var isCurrent = p.Id == Session.CurrentPlayerId && !p.Eliminated;
-            var tag = p.Id == Session.MyId ? " (you)" : p.IsBot ? " (bot)" : "";
-
-            ImGui.AlignTextToFramePadding();
-            ImGui.TextColored(isCurrent ? TurnGreen : Grey, isCurrent ? ">>" : "  ");
-            ImGui.SameLine(0, 4);
-
-            var nameColor = p.Eliminated ? Grey : isCurrent ? TurnGreen : Vector4.One;
-            ImGui.TextColored(nameColor, p.Name + tag);
-            ImGui.SameLine(0, 10);
-
-            if (p.Eliminated)
-                ImGui.TextDisabled("— out");
-            else if (p.DiceCount > 0)
-                DiceRenderer.HiddenHand(p.DiceCount, 15f);
-        }
-    }
-
-    private void DrawBidControls()
-    {
-        ImGui.TextColored(new Vector4(0.5f, 1f, 0.5f, 1f), "Your turn!");
-
-        ImGui.SetNextItemWidth(120);
-        ImGui.InputInt("Quantity", ref _bidQuantity);
-        if (_bidQuantity < 1) _bidQuantity = 1;
-
-        ImGui.SetNextItemWidth(120);
-        ImGui.SliderInt("Face", ref _bidFace, Bid.MinFace, Bid.MaxFace);
-
-        var proposed = new Bid(_bidQuantity, _bidFace);
-        var legal = proposed.IsValidShape &&
-                    (Session.CurrentBid is not { } cur || proposed.IsHigherThan(cur.ToBid()));
-
-        ImGui.BeginDisabled(!legal);
-        if (ImGui.Button("Place Bid"))
-            Client.Send(new PlaceBid(_bidQuantity, _bidFace));
-        ImGui.EndDisabled();
-
-        if (!legal)
-            ImGui.TextDisabled("Bid must raise the standing bid.");
     }
 
     private void DrawGameOver()
     {
         var winner = Session.WinnerId is { } w ? Session.NameOf(w) : "nobody";
-        ImGui.TextColored(Gold, $"{winner} wins!");
+        ImGui.TextColored(TableUi.Gold, $"{winner} wins!");
         ImGui.Spacing();
-        DrawRoster();
-
-        ImGui.Spacing();
-        if (ImGui.Button("Leave Room")) LeaveRoom();
+        TableUi.Roster(Session);
     }
 
     private void DrawLog()

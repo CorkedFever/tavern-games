@@ -1,28 +1,54 @@
-# Liar's Dice
+# Tavern Games
 
-A [Dalamud](https://github.com/goatcorp/Dalamud) plugin for Final Fantasy XIV that lets
-you play the bluffing dice game **Liar's Dice** with other players, plus the relay
-server that connects them.
+A [Dalamud](https://github.com/goatcorp/Dalamud) plugin for Final Fantasy XIV that puts
+a table of tavern games in your game window, plus the relay server that connects
+players. Open a room, share the code, fill empty seats with bots, and let onlookers
+spectate.
 
-> ⚠️ Like all Dalamud plugins, this is a third-party tool and using it is against the
-> FFXIV Terms of Service. Build and run at your own risk.
+**Games so far:** Liar's Dice, Pig.
+
+> Like all Dalamud plugins, this is a third-party tool and using it is against the
+> FFXIV Terms of Service. Build and run at your own risk. Wagers are flavor only: the
+> plugin never touches gil.
 
 ## How it works
 
 Players don't talk to each other through the game. Each plugin opens a WebSocket to a
-small **relay server**, which matchmakes players into rooms by a short code and acts as
-the **authoritative game host** — it rolls the dice and only reveals hands when someone
-calls a bluff, so a tampered client can't cheat about its own dice.
+small **relay server**, which matchmakes players into rooms by a short code and is the
+**authoritative host** for every game: it rolls the dice, keeps hidden state hidden, and
+only tells each seat what that seat is allowed to see. A tampered client can't cheat.
+
+The server and plugin are split into a **platform** and **games**:
+
+- The platform owns everything games share: rooms and codes, seating, bots, spectators,
+  pacing, delivery, the lobby UI, the log, and chat-log narration.
+- A game is a server-side `IGameModule` (rules, bot brain, its own wire messages) and a
+  plugin-side `IClientGame` (state, log wording, narration, table view).
 
 ## Projects
 
 | Project | Target | Role |
 |---|---|---|
-| `src/TavernGames.Core` | `net10.0` | Pure game engine + the shared network message contracts. No Dalamud. |
-| `src/TavernGames.Server` | `net10.0` | ASP.NET Core WebSocket relay + authoritative game host. |
-| `src/TavernGames.Plugin` | `net10.0-windows` | The Dalamud plugin: ImGui UI + network client. |
-| `tests/TavernGames.Core.Tests` | `net10.0` | Unit tests for the engine. |
-| `tests/TavernGames.Server.Tests` | `net10.0` | End-to-end game-flow tests through the real server. |
+| `src/TavernGames.Core` | `net10.0` | Platform contracts, wire protocol, and every game's rules. No Dalamud. |
+| `src/TavernGames.Server` | `net10.0` | ASP.NET Core WebSocket relay and authoritative host. Game-agnostic. |
+| `src/TavernGames.Plugin` | `net10.0-windows` | The Dalamud plugin: ImGui shell, network client, per-game views. |
+| `tests/TavernGames.Core.Tests` | `net10.0` | Engine, bot, platform and wire-format tests. |
+| `tests/TavernGames.Server.Tests` | `net10.0` | End-to-end games played through the real server. |
+
+## Adding a game
+
+1. **Rules** in `src/TavernGames.Core/Games/<Name>/`: a plain engine class, its message
+   records, and an `IGameModule` that turns moves into `Emit`s (`ToAll`, `ToPlayer`,
+   `Pause`). Give it a static `GameDescriptor` (name, player counts, room options, and
+   its message types with namespaced wire names like `mygame.move`).
+2. **Register it** by adding the descriptor to `GameCatalog.Games`. The room, the
+   serializer and the lobby's game picker and option sliders pick it up from there.
+3. **Plugin view** in `src/TavernGames.Plugin/Games/`: an `IClientGame`, added to the
+   list in `Plugin.cs`.
+4. **Tests**: engine rules, a bot fuzz (every bot move must be legal and games must
+   end), and one end-to-end game in `TavernGames.Server.Tests`.
+
+No platform code changes. Pig was added this way as the proof.
 
 ## Build
 
@@ -35,29 +61,34 @@ dotnet build TavernGames.slnx -c Release
 dotnet test
 ```
 
-A successful Release build of the plugin produces a dev-installable folder at
-`src/TavernGames.Plugin/bin/Release/LiarsDice/` (containing `latest.zip`).
-
 ## Run the server
 
 ```sh
-# Listens on http://0.0.0.0:5050 by default; WebSocket endpoint is /ws.
+# Listens on port 5050; the WebSocket endpoint is /ws and /health reports status.
 dotnet run --project src/TavernGames.Server -c Release
-# Override the address:
-ASPNETCORE_URLS=http://0.0.0.0:8080 dotnet run --project src/TavernGames.Server -c Release
 ```
+
+Environment knobs: `TAVERN_MAX_ROOMS` (default 200) caps concurrent rooms;
+`TAVERN_BOT_DELAY_MS` overrides bot pacing (tests set it to 0). See `deploy/` for
+running it in Docker behind Caddy.
 
 ## Use the plugin
 
-1. Point Dalamud's dev-plugin loader at the built `LiarsDice` folder.
-2. In game, run `/liarsdice` to open the window.
-3. Set the server URL (default `ws://localhost:5050/ws`), connect, then **Create Room**
-   or **Join** with a 4-character code. The host starts the game once ≥2 players are in.
+1. In `/xlsettings` → Experimental → Dev Plugin Locations, add
+   `src/TavernGames.Plugin/bin/Release/TavernGames.dll`, then enable it in `/xlplugins`.
+2. In game, run `/tavern`.
+3. Set the server URL (default `ws://localhost:5050/ws`) and connect. Pick a game and
+   **Create Room**, or **Join** / **Spectate** with a 4-character code. The host can add
+   bots and starts the game.
 
-## Rules (Perudo-style common hand)
+## The games
 
-Everyone rolls their dice in secret. Going in turn, you either **raise** the standing bid
-(more dice, or the same count of a higher face) or **call liar**. On a call, all hands are
-revealed and the bid's face is counted across the whole table: if there are at least as
-many as bid, the caller loses a die; otherwise the bidder does. Lose all your dice and
-you're out. Last player standing wins.
+**Liar's Dice** (2-6 players). Everyone rolls in secret. In turn you raise the standing
+bid (more dice, or the same count of a higher face). Anyone except the bidder can call
+liar at any time: all hands are revealed and the face is counted across the table. If
+the bid holds, the caller loses a die; if not, the bidder does. Last player with dice
+wins.
+
+**Pig** (2-6 players). On your turn roll one die as often as you dare, adding each roll
+to the pot. Hold to bank the pot; roll a 1 and the pot is lost. First to the target
+score (default 100) wins.

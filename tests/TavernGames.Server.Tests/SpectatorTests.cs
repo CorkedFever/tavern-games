@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc.Testing;
+using TavernGames.Core.Games.LiarsDice;
 using TavernGames.Core.Protocol;
 
 namespace TavernGames.Server.Tests;
@@ -27,7 +28,7 @@ public class SpectatorTests : IClassFixture<WebApplicationFactory<Program>>
         await using var host = await ConnectAsync();
         await using var watcher = await ConnectAsync();
 
-        await host.SendAsync(new CreateRoom("Host", StartingDice: 1));
+        await host.SendAsync(new CreateRoom("Host", LiarsDiceModule.Type, new() { ["startingDice"] = 1 }));
         var id = await host.ReceiveUntilAsync<Identity>();
 
         await host.SendAsync(new AddBot());

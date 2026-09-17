@@ -1,4 +1,4 @@
-namespace TavernGames.Core;
+namespace TavernGames.Core.Games.LiarsDice;
 
 /// <summary>A bot's chosen action for its turn: either raise with <see cref="Bid"/> or call liar.</summary>
 public readonly record struct BotDecision(bool IsChallenge, Bid Bid)

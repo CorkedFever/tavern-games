@@ -1,4 +1,5 @@
 using TavernGames.Core;
+using TavernGames.Core.Games.LiarsDice;
 
 namespace TavernGames.Core.Tests;
 
@@ -18,7 +19,7 @@ public class LiarsDiceGameTests
     {
         var game = TwoPlayerGame(new ScriptedRoller(3));
 
-        Assert.Equal(GamePhase.Bidding, game.Phase);
+        Assert.Equal(GamePhase.Playing, game.Phase);
         Assert.All(game.Players, p => Assert.Equal(5, p.Dice.Count));
         Assert.Equal("a", game.Current.Id);
     }

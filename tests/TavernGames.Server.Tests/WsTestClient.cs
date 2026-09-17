@@ -1,5 +1,6 @@
 using System.Net.WebSockets;
 using System.Text;
+using TavernGames.Core.Games.LiarsDice;
 using TavernGames.Core.Protocol;
 
 namespace TavernGames.Server.Tests;

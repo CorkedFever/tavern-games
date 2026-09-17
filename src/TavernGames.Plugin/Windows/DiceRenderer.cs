@@ -19,12 +19,17 @@ internal static class DiceRenderer
     private static readonly Vector4 DeadFace = new(0.28f, 0.28f, 0.28f, 1f);
     private static readonly Vector4 DeadBorder = new(0.40f, 0.40f, 0.40f, 1f);
 
-    /// <summary>Draws a single face-up die showing <paramref name="value"/> and advances the layout.</summary>
-    public static void Die(int value, float size)
+    private static readonly Vector4 HighlightBorder = new(1f, 0.78f, 0.2f, 1f);
+
+    /// <summary>
+    /// Draws a single face-up die showing <paramref name="value"/> and advances the layout.
+    /// A highlighted die gets a gold rim (used to pick out the dice that matched a bid).
+    /// </summary>
+    public static void Die(int value, float size, bool highlight = false)
     {
         var dl = ImGui.GetWindowDrawList();
         var p = ImGui.GetCursorScreenPos();
-        DrawBody(dl, p, size, Face, Border);
+        DrawBody(dl, p, size, Face, highlight ? HighlightBorder : Border, highlight ? 2.2f : 1f);
         DrawPips(dl, p, size, value);
         ImGui.Dummy(new Vector2(size, size));
     }
@@ -46,12 +51,12 @@ internal static class DiceRenderer
         ImGui.Dummy(new Vector2(size, size));
     }
 
-    /// <summary>Draws a row of face-up dice.</summary>
-    public static void Hand(int[] dice, float size, float gap = 5f)
+    /// <summary>Draws a row of face-up dice, optionally rimming every die showing <paramref name="highlightFace"/>.</summary>
+    public static void Hand(int[] dice, float size, float gap = 5f, int highlightFace = 0)
     {
         for (var i = 0; i < dice.Length; i++)
         {
-            Die(dice[i], size);
+            Die(dice[i], size, highlight: dice[i] == highlightFace);
             if (i < dice.Length - 1) ImGui.SameLine(0, gap);
         }
     }
@@ -66,12 +71,12 @@ internal static class DiceRenderer
         }
     }
 
-    private static void DrawBody(ImDrawListPtr dl, Vector2 p, float size, Vector4 face, Vector4 border)
+    private static void DrawBody(ImDrawListPtr dl, Vector2 p, float size, Vector4 face, Vector4 border, float weight = 1f)
     {
         var p2 = p + new Vector2(size, size);
         var rounding = size * 0.18f;
         dl.AddRectFilled(p, p2, ImGui.GetColorU32(face), rounding);
-        dl.AddRect(p, p2, ImGui.GetColorU32(border), rounding, ImDrawFlags.RoundCornersAll, MathF.Max(1f, size * 0.05f));
+        dl.AddRect(p, p2, ImGui.GetColorU32(border), rounding, ImDrawFlags.RoundCornersAll, MathF.Max(1f, size * 0.05f) * weight);
     }
 
     private static void DrawPips(ImDrawListPtr dl, Vector2 p, float size, int value)

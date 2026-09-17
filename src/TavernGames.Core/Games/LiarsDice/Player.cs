@@ -1,4 +1,4 @@
-namespace TavernGames.Core;
+namespace TavernGames.Core.Games.LiarsDice;
 
 /// <summary>
 /// A participant in a game. <see cref="Dice"/> holds the current round's secret

@@ -3,6 +3,7 @@ using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using TavernGames.Plugin.Game;
+using TavernGames.Plugin.Games;
 using TavernGames.Plugin.Windows;
 
 namespace TavernGames.Plugin;
@@ -20,7 +21,7 @@ public sealed class Plugin : IDalamudPlugin
 
     internal Configuration Config { get; }
     internal GameClient Client { get; }
-    internal GameSession Session { get; } = new();
+    internal GameSession Session { get; } = new([new LiarsDiceClient(), new PigClient()]);
 
     private readonly WindowSystem _windows = new("TavernGames");
     private readonly MainWindow _mainWindow;

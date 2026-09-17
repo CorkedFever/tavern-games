@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc.Testing;
+using TavernGames.Core.Games.LiarsDice;
 using TavernGames.Core.Protocol;
 
 namespace TavernGames.Server.Tests;
@@ -20,7 +21,7 @@ public class GameFlowTests(WebApplicationFactory<Program> factory) : IClassFixtu
         await using var guest = await ConnectAsync();
 
         // Host creates a single-die room.
-        await host.SendAsync(new CreateRoom("Host", StartingDice: 1));
+        await host.SendAsync(new CreateRoom("Host", LiarsDiceModule.Type, new() { ["startingDice"] = 1 }));
         var hostId = (await host.ReceiveUntilAsync<Identity>());
         var roomCode = hostId.RoomCode;
 
@@ -37,7 +38,7 @@ public class GameFlowTests(WebApplicationFactory<Program> factory) : IClassFixtu
         await guest.ReceiveUntilAsync<RoundStarted>();
 
         Assert.Equal(2, round.Players.Length);
-        Assert.All(round.Players, p => Assert.Equal(1, p.DiceCount));
+        Assert.All(round.Players, p => Assert.Equal(1, p.Tally));
 
         // Identify the player to act and their opponent.
         var current = round.CurrentPlayerId == hostId.PlayerId ? host : guest;

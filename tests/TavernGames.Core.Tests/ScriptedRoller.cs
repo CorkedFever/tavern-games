@@ -1,4 +1,5 @@
 using TavernGames.Core;
+using TavernGames.Core.Games.LiarsDice;
 
 namespace TavernGames.Core.Tests;
 

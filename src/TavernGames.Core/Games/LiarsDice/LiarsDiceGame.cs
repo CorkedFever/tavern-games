@@ -1,4 +1,4 @@
-namespace TavernGames.Core;
+namespace TavernGames.Core.Games.LiarsDice;
 
 /// <summary>
 /// Authoritative Liar's Dice engine (Perudo-style "common hand").
@@ -75,7 +75,7 @@ public sealed class LiarsDiceGame
             Phase = GamePhase.GameOver;
             WinnerId = _players.FirstOrDefault(p => !p.IsEliminated)?.Id;
         }
-        else if (Phase == GamePhase.Bidding && _players[_turnIndex].IsEliminated)
+        else if (Phase == GamePhase.Playing && _players[_turnIndex].IsEliminated)
         {
             _turnIndex = NextActiveIndex(_turnIndex);
         }
@@ -188,7 +188,7 @@ public sealed class LiarsDiceGame
         CurrentBid = null;
         CurrentBidderId = null;
         _turnIndex = _players[startIndex].IsEliminated ? NextActiveIndex(startIndex) : startIndex;
-        Phase = GamePhase.Bidding;
+        Phase = GamePhase.Playing;
     }
 
     private int NextActiveIndex(int from)
@@ -203,7 +203,7 @@ public sealed class LiarsDiceGame
 
     private void EnsureBidding()
     {
-        if (Phase != GamePhase.Bidding)
+        if (Phase != GamePhase.Playing)
             throw new InvalidOperationException($"Action not allowed in phase {Phase}.");
     }
 }

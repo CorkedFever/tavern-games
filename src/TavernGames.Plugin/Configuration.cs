@@ -13,7 +13,11 @@ public sealed class Configuration : IPluginConfiguration
     /// <summary>Display name shown to other players. Defaults to the local character name when empty.</summary>
     public string PlayerName { get; set; } = "";
 
-    public int StartingDice { get; set; } = 5;
+    /// <summary>The game picked last time a room was created.</summary>
+    public string LastGameType { get; set; } = "liarsdice";
+
+    /// <summary>Remembered per-game room options, keyed "gameType.optionKey".</summary>
+    public Dictionary<string, int> GameOptions { get; set; } = new();
 
     /// <summary>Pause (ms) bots take per move; also paces the gap between rounds. Host-set per room.</summary>
     public int TurnDelayMs { get; set; } = 1500;
