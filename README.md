@@ -138,7 +138,9 @@ its left post the blinds, which double every so many hands (or never, if you set
 zero); heads-up the button posts the small blind, acts first before the flop and last on
 every later street. The minimum raise is the size of the last bet or raise on the street:
 an all-in for less than that is allowed, but it does not reopen the betting for anyone who
-has already acted. Chips no opponent could match are handed back rather than won, side
-pots pay each seat only what it covered, and a split that does not divide evenly gives the
-odd chips to the tied seats nearest the button's left. A seat with nothing left after a
+has already acted, and once every opponent is all-in there is nothing left to raise at.
+Chips no opponent could match are handed back rather than won, side pots pay each seat only
+what it covered, and a split that does not divide evenly gives the odd chips to the tied
+seats nearest the button's left. A seat that walks out mid-hand folds on the spot and
+leaves behind only what somebody had already matched. A seat with nothing left after a
 hand is out. Only the hands that reach a showdown are ever shown.

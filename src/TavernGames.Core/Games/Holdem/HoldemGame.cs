@@ -104,8 +104,9 @@ public sealed record HoldemEvent(
 /// the button's left.</item>
 /// <item>No antes, no rake, and no burn cards: a burn card is never shown, so burning would
 /// only make stacked-deck tests harder to read.</item>
-/// <item>A player who leaves mid-hand folds at once. The chips they already pushed in stay
-/// in the pot; the rest of their stack leaves the game with them.</item>
+/// <item>A player who leaves mid-hand folds at once. What they pushed in stays in the pot as
+/// far as an opponent had matched it; the rest of their stack, a bet nobody could call
+/// included, leaves the game with them.</item>
 /// </list>
 /// </summary>
 public sealed class HoldemGame
@@ -216,8 +217,9 @@ public sealed class HoldemGame
     }
 
     /// <summary>
-    /// A departing seat folds immediately. Their chips in the pot stay there as dead money,
-    /// the rest of their stack leaves the game, and play moves on without them.
+    /// A departing seat folds immediately. Whatever of their money an opponent had already
+    /// matched stays in the pot as dead money; the rest of their stack, uncalled chips
+    /// included, leaves the game with them, and play moves on without them.
     /// </summary>
     public IReadOnlyList<HoldemEvent> RemovePlayer(string id)
     {
@@ -228,8 +230,12 @@ public sealed class HoldemGame
         var wasPlaying = Phase == GamePhase.Playing;
         var wasActor = _actor == index;
 
-        if (wasPlaying && player.Committed > 0)
-            _deadStakes.Add(new Stake(player.Id, player.Committed, Folded: true));
+        // A bet nobody could match is always handed back to whoever made it, and walking out
+        // is no way round that: leaving the whole of an uncalled shove behind would make
+        // closing the window a way of handing a stack to whoever wins the hand.
+        var dead = Math.Min(player.Committed, Matched(player));
+        if (wasPlaying && dead > 0)
+            _deadStakes.Add(new Stake(player.Id, dead, Folded: true));
 
         _players.RemoveAt(index);
         // Both markers are positions, so shift them to keep pointing at the same seats. When
@@ -237,6 +243,10 @@ public sealed class HoldemGame
         // next scan then starts from the seat after the empty chair.
         if (index <= _button) _button--;
         if (_actor >= 0 && index <= _actor) _actor--;
+        // Off the front of the list the button falls off the table entirely. Wrapping from -1
+        // and from the last seat walks the same order, so nothing about play changes, but the
+        // marker has to name a seat or the room loses its dealer button for the rest of the hand.
+        if (wasPlaying && _button < 0 && _players.Count > 0) _button = _players.Count - 1;
 
         if (!wasPlaying) return [];
 
@@ -352,8 +362,16 @@ public sealed class HoldemGame
     /// <summary>Everything <paramref name="player"/> has, counting what is already in front of them.</summary>
     public int MaxRaiseTo(HoldemPlayer player) => player.StreetBet + player.Chips;
 
-    /// <summary>False when the seat may only call or fold: it is short, or a short all-in closed the action on it.</summary>
-    public bool CanRaise(HoldemPlayer player) => player.MayRaise && MaxRaiseTo(player) > _currentBet;
+    /// <summary>
+    /// False when the seat may only call or fold: it is short, a short all-in closed the
+    /// action on it, or every opponent left in the hand is already all-in. That last case is
+    /// the one people forget: with nobody able to put in another chip there is nothing to
+    /// raise, so no-limit simply does not offer the move.
+    /// </summary>
+    public bool CanRaise(HoldemPlayer player) =>
+        player.MayRaise
+        && MaxRaiseTo(player) > _currentBet
+        && _players.Any(other => other != player && other.Live && !other.AllIn);
 
     /// <summary>How many seats still act behind this one on this street. Position, as one number.</summary>
     public int SeatsYetToAct(HoldemPlayer player)
@@ -725,6 +743,18 @@ public sealed class HoldemGame
         player.Committed -= refund;
         return (player.Id, refund);
     }
+
+    /// <summary>
+    /// The most anybody else has in the pot, which is the ceiling on what one seat's own
+    /// stake could ever be called for. Departed seats count: their chips are in there too.
+    /// </summary>
+    private int Matched(HoldemPlayer player) =>
+        _players
+            .Where(p => p != player)
+            .Select(p => p.Committed)
+            .Concat(_deadStakes.Select(s => s.Contributed))
+            .DefaultIfEmpty(0)
+            .Max();
 
     private List<Stake> Stakes() =>
         _players

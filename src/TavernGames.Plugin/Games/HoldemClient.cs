@@ -68,6 +68,7 @@ public sealed class HoldemClient : IClientGame
                 return true;
 
             case HoldemStreetDealt m:
+                _raiseTo = 0; // a new street is a new bet: never carry the last one over
                 SetTable(m.Table, session);
                 session.AddLog($"The {StreetName(m.Street)}: {CardList(m.Dealt)}.");
                 return true;
@@ -273,7 +274,9 @@ public sealed class HoldemClient : IClientGame
         // the reason next to them: a control that vanishes just looks like a missing feature.
         var min = table.MinRaiseTo;
         var max = table.MaxRaiseTo;
-        _raiseTo = Math.Clamp(_raiseTo, min, max);
+        // Snap back rather than clamp: a figure left over from a bigger street would otherwise
+        // be squeezed down onto the stack and quietly turn the default button into an all-in.
+        if (_raiseTo < min || _raiseTo > max) _raiseTo = min;
 
         ImGui.BeginDisabled(!table.CanRaise);
 

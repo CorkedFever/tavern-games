@@ -187,10 +187,10 @@ public class HoldemTests
     {
         var game = UnevenTable(Filler);
         // Hand two: Bob on the button with 400, Cid the small blind with 200, Alice the big blind with 300.
-        game.Act("b", HoldemMove.Raise, 120); // a raise of 100 over the big blind
+        game.Act("b", HoldemMove.Raise, 115); // a raise of 95 over the big blind
 
-        // Cid cannot reach 220, so all-in for 200 is a raise of only 80.
-        Assert.Equal(220, game.MinRaiseTo);
+        // Cid cannot reach 210, so all-in for 200 is a raise of only 85.
+        Assert.Equal(210, game.MinRaiseTo);
         game.Act("c", HoldemMove.Raise, 200);
         Assert.Equal(200, game.CurrentBet);
 
@@ -199,11 +199,37 @@ public class HoldemTests
         // Alice has not acted yet, so she keeps the full right to raise.
         Assert.True(game.CanRaise(P(game, "a")));
 
-        game.Act("a", HoldemMove.Raise, 300); // a full raise of 100 on top
+        // A full raise of 95 on top. Alice keeps five chips back rather than shoving, because
+        // a table where every opponent is all-in has no raise left in it to reopen.
+        game.Act("a", HoldemMove.Raise, 295);
+        Assert.False(P(game, "a").AllIn);
 
         // A full raise reopens the betting for everyone, Bob included.
         Assert.True(game.CanRaise(P(game, "b")));
         Assert.Equal("b", game.CurrentPlayer?.Id);
+    }
+
+    [Fact]
+    public void WithEveryOpponentAllIn_ThereIsNoRaiseLeft_HoweverMuchIsBehind()
+    {
+        var game = UnevenTable(Filler);
+        // Hand two: Bob on the button with 400, Cid the small blind with 200, Alice the big blind with 300.
+        game.Act("b", HoldemMove.Call);       // 20
+        game.Act("c", HoldemMove.Raise, 200); // Cid shoves: a full raise, so Bob is live again
+        game.Act("a", HoldemMove.Raise, 300); // Alice shoves too, short of the 380 minimum
+
+        // Bob is back on the clock with 380 behind and nobody left who could put in another
+        // chip. A raise needs someone able to call it, so his only moves are call and fold.
+        Assert.Equal("b", game.CurrentPlayer?.Id);
+        Assert.False(game.CanRaise(P(game, "b")));
+        Assert.False(game.Snapshot().CanRaise);
+
+        var refused = Assert.Throws<InvalidOperationException>(() => game.Act("b", HoldemMove.Raise, 400));
+        Assert.Contains("call or fold", refused.Message);
+
+        // Calling is still fine, and closes the betting for good.
+        var events = game.Act("b", HoldemMove.Call);
+        Assert.Contains(events, e => e.Kind == HoldemEventKind.HandEnded);
     }
 
     [Fact]
@@ -342,6 +368,7 @@ public class HoldemTests
         Assert.Equal(200, P(game, "a").StreetBet);
         Assert.Equal(400, game.CurrentBet); // the short blind does not lower the price
         Assert.Equal("b", game.CurrentPlayer?.Id);
+        Assert.False(game.CanRaise(P(game, "b"))); // and there is nobody left to raise at
 
         var events = game.Act("b", HoldemMove.Call);
         var ended = events.First(e => e.Kind == HoldemEventKind.HandEnded);
@@ -419,7 +446,56 @@ public class HoldemTests
         Assert.Contains(events, e => e.Kind == HoldemEventKind.HandEnded);
         Assert.Equal(GamePhase.GameOver, game.Phase);
         Assert.Equal("a", game.WinnerId);
-        Assert.Equal(1020, Chips(game, "a")); // her own 10 back plus the 20 Bob walked away from
+        // Her own 10 back, plus the 10 of Bob's blind she had matched. The other half of his
+        // blind was never called, so it goes out of the door with him.
+        Assert.Equal(1010, Chips(game, "a"));
+    }
+
+    [Fact]
+    public void TheButtonLeavingMidHand_LeavesTheMarkerOnASeat_AndChangesNoOrder()
+    {
+        var game = Ring(Filler);
+        Assert.Equal("a", game.ButtonId);
+        game.Act("a", HoldemMove.Call);
+        game.Act("b", HoldemMove.Call);
+        game.Act("c", HoldemMove.Check); // the flop is out and Bob is first to act
+
+        game.RemovePlayer("a"); // the seat holding the button walks out
+
+        // The button is a dead button on the empty chair, which is the seat before Bob either
+        // way, so the table still has a marker to draw and the order is untouched.
+        Assert.Equal("c", game.ButtonId);
+        Assert.Equal("b", game.CurrentPlayer?.Id);
+
+        game.Act("b", HoldemMove.Check);
+        game.Act("c", HoldemMove.Check);
+        game.Act("b", HoldemMove.Check);
+        game.Act("c", HoldemMove.Check);
+        game.Act("b", HoldemMove.Check);
+        game.Act("c", HoldemMove.Check); // checked down to a showdown, and the next hand deals
+
+        Assert.Equal(2, game.Hand);
+        Assert.Equal("b", game.ButtonId); // the button moves on exactly as it would have
+    }
+
+    [Fact]
+    public void AShoveFromASeatThatThenLeaves_StaysInThePotOnlyAsFarAsItWasMatched()
+    {
+        var game = UnevenTable(Filler);
+        // Hand two: Bob on the button with 400, Cid the small blind (10 in), Alice the big blind (20 in).
+        game.Act("b", HoldemMove.Raise, 400); // Bob shoves
+        game.RemovePlayer("b");               // and closes the window before anyone can answer
+
+        // Only the 20 Alice had already put up ever covered any of it. An uncalled bet is
+        // refunded whoever made it, so the rest leaves the game on Bob's way out rather than
+        // swelling a pot he cannot win.
+        Assert.Equal(50, game.Pot); // Alice's 20, Cid's 10 and the 20 of Bob's that was matched
+
+        var events = game.Act("c", HoldemMove.Fold);
+
+        var ended = events.First(e => e.Kind == HoldemEventKind.HandEnded);
+        Assert.Equal([("a", 50)], ended.Awards!.Select(x => (x.PlayerId, x.Amount)).ToArray());
+        Assert.Equal(330, Stack(ended, "a"));
     }
 
     [Fact]
@@ -534,20 +610,42 @@ public class HoldemTests
     // ----------------------------------------------------------------------- bots
 
     [Fact]
-    public void Bots_AlwaysProduceLegalMoves_AndEveryGameFinishes()
+    public void Bots_AlwaysProduceLegalMoves_EveryGameFinishes_AndTheChipsAlwaysAddUp()
     {
         var rng = new Random(9);
         for (var trial = 0; trial < 40; trial++)
         {
+            var startingChips = 500 + trial * 50;
+            var seats = 2 + trial % (HoldemGame.MaxPlayers - 1);
             var module = new HoldemModule(
                 Deck.Shuffled,
-                startingChips: 500 + trial * 50,
+                startingChips,
                 smallBlind: 10,
                 blindsUpEvery: trial % 4 == 0 ? 0 : 2 + trial % 5);
 
-            for (var i = 0; i < 2 + trial % (HoldemGame.MaxPlayers - 1); i++)
+            for (var i = 0; i < seats; i++)
                 module.AddPlayer($"bot{i}", $"Bot {i}", isBot: true);
-            module.Start();
+
+            // Refunds, side pots and odd chips all move money by hand, so the bank is audited
+            // on every public table: no chip is ever minted or burned, and a hand pays out
+            // exactly what was pushed into it, no more and none left behind.
+            var bank = startingChips * seats;
+            var stakedBeforeSettling = 0;
+
+            void Audit(IReadOnlyList<Emit> emits)
+            {
+                foreach (var message in emits.OfType<ToAll>().Select(e => e.Message))
+                {
+                    if (message is HoldemHandEnded ended)
+                        Assert.Equal(stakedBeforeSettling, ended.Awards.Sum(a => a.Amount));
+
+                    if (TableOf(message) is not { } table) continue;
+                    Assert.Equal(bank, table.Seats.Sum(s => s.Chips) + table.Pot);
+                    stakedBeforeSettling = table.Pot;
+                }
+            }
+
+            Audit(module.Start());
 
             for (var step = 0; step < 100_000 && module.Phase == GamePhase.Playing; step++)
             {
@@ -555,7 +653,7 @@ public class HoldemTests
                 Assert.NotNull(actor);
                 var move = module.DecideBotMove(actor!, rng);
                 Assert.NotNull(move);
-                module.Handle(actor!, move!); // throws if the bot chose something illegal
+                Audit(module.Handle(actor!, move!)); // throws if the bot chose something illegal
             }
 
             Assert.Equal(GamePhase.GameOver, module.Phase);
@@ -614,6 +712,7 @@ public class HoldemTests
     public void NoUnshownHoleCard_EverReachesAPublicMessage()
     {
         var rng = new Random(21);
+        var evictions = 0;
         for (var trial = 0; trial < 8; trial++)
         {
             var module = new HoldemModule(Deck.Shuffled, 400, 10, 3);
@@ -664,11 +763,27 @@ public class HoldemTests
             Inspect(module.Start());
             for (var step = 0; step < 100_000 && module.Phase == GamePhase.Playing; step++)
             {
+                // A late watcher's catch-up is a public message like any other, and so is the
+                // redraw a seat leaving triggers. Both are built from the same snapshot, so
+                // both go through the same scan rather than being taken on trust.
+                Inspect([.. module.CatchUp().Select(m => (Emit)new ToAll(m))]);
+
+                // Half the tables also lose a seat mid-hand, which is the other way a snapshot
+                // reaches the room without anybody having acted.
+                if (trial % 2 == 1 && step > 0 && step % 17 == 0 && module.Roster().Length > 2)
+                {
+                    evictions++;
+                    Inspect(module.RemovePlayer(module.Roster()[^1].Id));
+                    if (module.Phase != GamePhase.Playing) break;
+                }
+
                 var actor = module.CurrentActorId!;
                 Inspect(module.Handle(actor, module.DecideBotMove(actor, rng)!));
             }
             Assert.Equal(GamePhase.GameOver, module.Phase);
         }
+
+        Assert.True(evictions > 0, "the scan should have covered seats walking out mid-hand");
     }
 
     [Fact]

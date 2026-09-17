@@ -52,7 +52,11 @@ public sealed record HoldemSeat(
     bool AllIn,
     bool Eliminated);
 
-/// <summary>A pot as it stands right now, and the seats that can still win it.</summary>
+/// <summary>
+/// A pot as it stands right now, and the seats that can still win it. Mid-street the bets
+/// are uneven by construction, so the breakdown only describes real side pots once a seat is
+/// all-in: see <see cref="HoldemTable.Pots"/>.
+/// </summary>
 public sealed record HoldemPotView(int Amount, string[] Eligible);
 
 /// <summary>
@@ -61,6 +65,11 @@ public sealed record HoldemPotView(int Amount, string[] Eligible);
 /// <see cref="ToCall"/>, <see cref="MinRaiseTo"/>, <see cref="MaxRaiseTo"/> and
 /// <see cref="CanRaise"/> describe the seat on the clock, which is public knowledge, so a
 /// client can draw legal controls without knowing anything private.
+///
+/// <see cref="Pot"/> is always the whole pot. <see cref="Pots"/> splits it the way it would
+/// be paid out if the hand ended here, which while a street is still being bet says nothing
+/// useful: an unmatched blind or an unanswered bet reads as a side pot only its owner can
+/// win. Draw the split only once some seat is all-in; until then show the total.
 /// </summary>
 public sealed record HoldemTable(
     int Hand,
@@ -104,6 +113,11 @@ public sealed record HoldemHandStarted(HoldemTable Table) : NetMessage;
 /// <summary>Your two hole cards, and nobody else's. Sent privately, once per hand.</summary>
 public sealed record HoldemYourCards(string[] Cards) : NetMessage;
 
+/// <summary>
+/// A blind going in. Both blinds are posted as the hand is dealt, so the table here is
+/// already the state after both of them: the message says who paid what, not what the table
+/// looked like halfway through paying.
+/// </summary>
 public sealed record HoldemBlindPosted(string PlayerId, int Amount, bool Big, HoldemTable Table) : NetMessage;
 
 /// <summary><paramref name="Amount"/> is the chips paid for a call, or the raise-TO total for a raise.</summary>
