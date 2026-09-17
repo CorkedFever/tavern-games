@@ -1,0 +1,17 @@
+# Caddy automatically obtains & renews a Let's Encrypt TLS cert for each host
+# below, and proxies WebSockets transparently (no extra config needed).
+#
+# Replace liarsdice.example.com with YOUR subdomain. Its DNS A record must
+# point at this droplet's public IP before Caddy can get a certificate.
+
+liarsdice.example.com {
+    reverse_proxy relay:5050
+}
+
+# ---- Adding another app later is just another block ----
+# Run the app as a service named e.g. "blog" in docker-compose.yml on the
+# same "web" network, then:
+#
+# blog.example.com {
+#     reverse_proxy blog:8080
+# }

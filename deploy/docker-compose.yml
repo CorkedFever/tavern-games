@@ -1,0 +1,36 @@
+# Runs the relay + Caddy (reverse proxy with automatic HTTPS) together.
+# From the repo's deploy/ folder on the droplet:  docker compose up -d --build
+
+services:
+  relay:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: liarsdice-relay
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_URLS=http://0.0.0.0:5050
+      # Optional knobs:
+      # - LIARSDICE_MAX_ROOMS=200       # cap concurrent rooms (abuse protection)
+    networks: [web]
+    # No host ports published — only Caddy is exposed to the internet.
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data       # persists issued TLS certificates
+      - caddy_config:/config
+    networks: [web]
+    depends_on: [relay]
+
+networks:
+  web:
+
+volumes:
+  caddy_data:
+  caddy_config:

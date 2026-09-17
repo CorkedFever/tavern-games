@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/LiarsDice.Core/LiarsDice.Core.csproj" />
+    <Project Path="src/LiarsDice.Plugin/LiarsDice.Plugin.csproj" />
+    <Project Path="src/LiarsDice.Server/LiarsDice.Server.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/LiarsDice.Core.Tests/LiarsDice.Core.Tests.csproj" />
+    <Project Path="tests/LiarsDice.Server.Tests/LiarsDice.Server.Tests.csproj" />
+  </Folder>
+</Solution>
