@@ -5,7 +5,7 @@ a table of tavern games in your game window, plus the relay server that connects
 players. Open a room, share the code, fill empty seats with bots, and let onlookers
 spectate.
 
-**Games so far:** Liar's Dice, Pig, Blackjack, Texas Hold'em.
+**Games so far:** Liar's Dice, Pig, Mia, Blackjack, Texas Hold'em.
 
 > Like all Dalamud plugins, this is a third-party tool and using it is against the
 > FFXIV Terms of Service. Build and run at your own risk. Wagers are flavor only: the
@@ -144,3 +144,11 @@ what it covered, and a split that does not divide evenly gives the odd chips to 
 seats nearest the button's left. A seat that walks out mid-hand folds on the spot and
 leaves behind only what somebody had already matched. A seat with nothing left after a
 hand is out. Only the hands that reach a showdown are ever shown.
+**Mia** (2-6 players). Roll two dice under a cup only you can see, then announce a value
+to the table. The higher die reads as the tens, so a 5 and a 2 is "52"; the mixed rolls
+rank 31 up to 65, then come the doubles, and 21 is Mia, which beats everything. The
+first announcement of a round is free and every later one has to be strictly higher,
+truthfully or otherwise. The next player either believes you, takes the cup and has to
+beat what they just accepted, or calls liar: your dice come out, and whoever was wrong
+loses a life. A Mia costs two lives, and since nothing beats it the player facing one
+may concede a single life instead of calling. Last player with lives wins.
