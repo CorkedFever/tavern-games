@@ -83,7 +83,7 @@ cd deploy && docker compose up -d --build
 3. Add the DNS A record for `myapp`, then `docker compose up -d`.
 
 ## Notes / hardening
-- Rooms are capped (`LIARSDICE_MAX_ROOMS`, default 200) and empty rooms are freed
+- Rooms are capped (`TAVERN_MAX_ROOMS`, default 200) and empty rooms are freed
   automatically. There's no account system — anyone with the URL can create rooms,
   which is fine for casual play. Room codes are 4 characters.
 - Consider creating a non-root user and disabling root SSH for extra safety.

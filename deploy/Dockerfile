@@ -5,13 +5,13 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Restore first (cached unless a .csproj changes).
-COPY src/LiarsDice.Core/LiarsDice.Core.csproj src/LiarsDice.Core/
-COPY src/LiarsDice.Server/LiarsDice.Server.csproj src/LiarsDice.Server/
-RUN dotnet restore src/LiarsDice.Server/LiarsDice.Server.csproj
+COPY src/TavernGames.Core/TavernGames.Core.csproj src/TavernGames.Core/
+COPY src/TavernGames.Server/TavernGames.Server.csproj src/TavernGames.Server/
+RUN dotnet restore src/TavernGames.Server/TavernGames.Server.csproj
 
 # Build & publish.
 COPY src/ src/
-RUN dotnet publish src/LiarsDice.Server/LiarsDice.Server.csproj -c Release -o /app --no-restore
+RUN dotnet publish src/TavernGames.Server/TavernGames.Server.csproj -c Release -o /app --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
@@ -21,4 +21,4 @@ COPY --from=build /app .
 ENV ASPNETCORE_URLS=http://0.0.0.0:5050
 EXPOSE 5050
 
-ENTRYPOINT ["dotnet", "LiarsDice.Server.dll"]
+ENTRYPOINT ["dotnet", "TavernGames.Server.dll"]

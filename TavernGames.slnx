@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TavernGames.Core/TavernGames.Core.csproj" />
+    <Project Path="src/TavernGames.Plugin/TavernGames.Plugin.csproj" />
+    <Project Path="src/TavernGames.Server/TavernGames.Server.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TavernGames.Core.Tests/TavernGames.Core.Tests.csproj" />
+    <Project Path="tests/TavernGames.Server.Tests/TavernGames.Server.Tests.csproj" />
+  </Folder>
+</Solution>

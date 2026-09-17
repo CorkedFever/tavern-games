@@ -1,0 +1,14 @@
+{
+  "Author": "CorkedFever",
+  "Name": "Tavern Games",
+  "Punchline": "Dice and bluffing games to play with other players in-game.",
+  "Description": "A collection of tavern games (Liar's Dice, Pig, and more). Create or join a room with a short code, fill seats with bots, and let onlookers spectate. Open with /tavern.",
+  "InternalName": "TavernGames",
+  "RepoUrl": "",
+  "ApplicableVersion": "any",
+  "Tags": [ "minigame", "dice", "multiplayer", "roleplay" ],
+  "CategoryTags": [ "other" ],
+  "LoadRequiredState": 0,
+  "AcceptsFeedback": true,
+  "IconUrl": ""
+}

@@ -18,11 +18,11 @@ calls a bluff, so a tampered client can't cheat about its own dice.
 
 | Project | Target | Role |
 |---|---|---|
-| `src/LiarsDice.Core` | `net10.0` | Pure game engine + the shared network message contracts. No Dalamud. |
-| `src/LiarsDice.Server` | `net10.0` | ASP.NET Core WebSocket relay + authoritative game host. |
-| `src/LiarsDice.Plugin` | `net10.0-windows` | The Dalamud plugin: ImGui UI + network client. |
-| `tests/LiarsDice.Core.Tests` | `net10.0` | Unit tests for the engine. |
-| `tests/LiarsDice.Server.Tests` | `net10.0` | End-to-end game-flow tests through the real server. |
+| `src/TavernGames.Core` | `net10.0` | Pure game engine + the shared network message contracts. No Dalamud. |
+| `src/TavernGames.Server` | `net10.0` | ASP.NET Core WebSocket relay + authoritative game host. |
+| `src/TavernGames.Plugin` | `net10.0-windows` | The Dalamud plugin: ImGui UI + network client. |
+| `tests/TavernGames.Core.Tests` | `net10.0` | Unit tests for the engine. |
+| `tests/TavernGames.Server.Tests` | `net10.0` | End-to-end game-flow tests through the real server. |
 
 ## Build
 
@@ -31,20 +31,20 @@ which XIVLauncher installs at `%AppData%\XIVLauncher\addon\Hooks\dev\` (override
 `DalamudLibPath` MSBuild property).
 
 ```sh
-dotnet build LiarsDice.slnx -c Release
+dotnet build TavernGames.slnx -c Release
 dotnet test
 ```
 
 A successful Release build of the plugin produces a dev-installable folder at
-`src/LiarsDice.Plugin/bin/Release/LiarsDice/` (containing `latest.zip`).
+`src/TavernGames.Plugin/bin/Release/LiarsDice/` (containing `latest.zip`).
 
 ## Run the server
 
 ```sh
 # Listens on http://0.0.0.0:5050 by default; WebSocket endpoint is /ws.
-dotnet run --project src/LiarsDice.Server -c Release
+dotnet run --project src/TavernGames.Server -c Release
 # Override the address:
-ASPNETCORE_URLS=http://0.0.0.0:8080 dotnet run --project src/LiarsDice.Server -c Release
+ASPNETCORE_URLS=http://0.0.0.0:8080 dotnet run --project src/TavernGames.Server -c Release
 ```
 
 ## Use the plugin
