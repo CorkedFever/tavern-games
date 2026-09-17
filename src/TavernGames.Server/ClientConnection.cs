@@ -13,6 +13,12 @@ public sealed class ClientConnection(WebSocket socket)
     public string? RoomCode { get; set; }
     public bool IsSpectator { get; set; }
 
+    /// <summary>Set once the client has said <c>Hello</c>. Null means an anonymous guest.</summary>
+    public string? ProfileId { get; set; }
+
+    /// <summary>The profile's display name, used at tables so it matches the leaderboards.</summary>
+    public string? DisplayName { get; set; }
+
     public Task SendAsync(NetMessage message) => SendRawAsync(message.Serialize());
 
     public async Task SendRawAsync(string json)

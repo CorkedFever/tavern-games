@@ -35,6 +35,29 @@ public abstract record NetMessage
         (typeof(SpectateAccepted), "spectateAccepted"),
         (typeof(RoomUpdate), "roomUpdate"),
         (typeof(GameEnded), "gameEnded"),
+        // Profiles and venues, client -> server
+        (typeof(Hello), "hello"),
+        (typeof(UpdateProfile), "profile.update"),
+        (typeof(GetStats), "profile.getStats"),
+        (typeof(DeleteProfile), "profile.delete"),
+        (typeof(CreateVenue), "venue.create"),
+        (typeof(JoinVenue), "venue.join"),
+        (typeof(LeaveVenue), "venue.leave"),
+        (typeof(GetVenue), "venue.get"),
+        (typeof(UpdateVenue), "venue.update"),
+        (typeof(DeleteVenue), "venue.delete"),
+        (typeof(RegenerateVenueCode), "venue.regenerateCode"),
+        (typeof(SetVenueRole), "venue.setRole"),
+        (typeof(KickFromVenue), "venue.kick"),
+        (typeof(GetLeaderboard), "venue.getLeaderboard"),
+        // Profiles and venues, server -> client
+        (typeof(Welcome), "welcome"),
+        (typeof(ProfileUpdated), "profile.updated"),
+        (typeof(Stats), "profile.stats"),
+        (typeof(ProfileDeleted), "profile.deleted"),
+        (typeof(VenueList), "venue.list"),
+        (typeof(VenueDetails), "venue.details"),
+        (typeof(VenueLeaderboard), "venue.leaderboard"),
     ];
 
     // Declared after PlatformMessages on purpose: static initializers run in textual order.
@@ -74,12 +97,15 @@ public abstract record NetMessage
 /// Opens a room for <paramref name="GameType"/> (see <see cref="GameCatalog"/>).
 /// <paramref name="Options"/> are the game's own settings; missing or out-of-range
 /// values fall back to that game's defaults. <paramref name="TurnDelayMs"/> paces bots.
+/// With a <paramref name="VenueId"/> the table is hosted by that venue (staff and owner
+/// only): members can find and join it, and its result counts on the venue's leaderboard.
 /// </summary>
 public sealed record CreateRoom(
     string PlayerName,
     string GameType,
     Dictionary<string, int>? Options = null,
-    int TurnDelayMs = 1500) : NetMessage;
+    int TurnDelayMs = 1500,
+    string? VenueId = null) : NetMessage;
 
 public sealed record JoinRoom(string RoomCode, string PlayerName) : NetMessage;
 
@@ -113,7 +139,8 @@ public sealed record RoomUpdate(
     string HostId,
     string GameType,
     GamePhase Phase,
-    PlayerPublic[] Players) : NetMessage;
+    PlayerPublic[] Players,
+    string? VenueName = null) : NetMessage;
 
 /// <summary>The game is over. Shared by every game.</summary>
 public sealed record GameEnded(string WinnerId, PlayerPublic[] Players) : NetMessage;

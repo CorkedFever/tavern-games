@@ -1,14 +1,13 @@
-using Microsoft.AspNetCore.Mvc.Testing;
 using TavernGames.Core.Games.Pig;
 using TavernGames.Core.Protocol;
 
 namespace TavernGames.Server.Tests;
 
-public class PigGameFlowTests : IClassFixture<WebApplicationFactory<Program>>
+public class PigGameFlowTests : IClassFixture<TavernFactory>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly TavernFactory _factory;
 
-    public PigGameFlowTests(WebApplicationFactory<Program> factory)
+    public PigGameFlowTests(TavernFactory factory)
     {
         Environment.SetEnvironmentVariable("TAVERN_BOT_DELAY_MS", "0");
         _factory = factory;

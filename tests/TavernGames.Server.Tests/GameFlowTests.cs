@@ -1,10 +1,9 @@
-using Microsoft.AspNetCore.Mvc.Testing;
 using TavernGames.Core.Games.LiarsDice;
 using TavernGames.Core.Protocol;
 
 namespace TavernGames.Server.Tests;
 
-public class GameFlowTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
+public class GameFlowTests(TavernFactory factory) : IClassFixture<TavernFactory>
 {
     private async Task<WsTestClient> ConnectAsync()
     {

@@ -1,14 +1,13 @@
-using Microsoft.AspNetCore.Mvc.Testing;
 using TavernGames.Core.Games.LiarsDice;
 using TavernGames.Core.Protocol;
 
 namespace TavernGames.Server.Tests;
 
-public class BotGameTests : IClassFixture<WebApplicationFactory<Program>>
+public class BotGameTests : IClassFixture<TavernFactory>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly TavernFactory _factory;
 
-    public BotGameTests(WebApplicationFactory<Program> factory)
+    public BotGameTests(TavernFactory factory)
     {
         // Make bots act instantly so the test isn't paced by "thinking" delays.
         Environment.SetEnvironmentVariable("TAVERN_BOT_DELAY_MS", "0");

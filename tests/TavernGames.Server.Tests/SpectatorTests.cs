@@ -1,14 +1,13 @@
-using Microsoft.AspNetCore.Mvc.Testing;
 using TavernGames.Core.Games.LiarsDice;
 using TavernGames.Core.Protocol;
 
 namespace TavernGames.Server.Tests;
 
-public class SpectatorTests : IClassFixture<WebApplicationFactory<Program>>
+public class SpectatorTests : IClassFixture<TavernFactory>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly TavernFactory _factory;
 
-    public SpectatorTests(WebApplicationFactory<Program> factory)
+    public SpectatorTests(TavernFactory factory)
     {
         Environment.SetEnvironmentVariable("TAVERN_BOT_DELAY_MS", "0");
         _factory = factory;

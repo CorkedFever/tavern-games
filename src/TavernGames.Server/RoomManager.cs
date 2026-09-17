@@ -16,7 +16,13 @@ public sealed class RoomManager
 
     public int RoomCount => _rooms.Count;
 
-    public GameRoom Create(string gameType, IReadOnlyDictionary<string, int>? options, int turnDelayMs)
+    public GameRoom Create(
+        string gameType,
+        IReadOnlyDictionary<string, int>? options,
+        int turnDelayMs,
+        string? venueId = null,
+        string? venueName = null,
+        Action<GameResult>? onResult = null)
     {
         if (_rooms.Count >= _maxRooms)
             throw new InvalidOperationException("The server is at capacity — please try again later.");
@@ -24,12 +30,21 @@ public sealed class RoomManager
         for (var attempt = 0; attempt < 10; attempt++)
         {
             var code = NewCode();
-            var room = new GameRoom(code, GameCatalog.Create(gameType, options), turnDelayMs);
+            var room = new GameRoom(code, GameCatalog.Create(gameType, options), turnDelayMs, venueId, venueName, onResult);
             if (_rooms.TryAdd(code, room))
                 return room;
         }
         throw new InvalidOperationException("Could not allocate a unique room code.");
     }
+
+    /// <summary>Tables currently open under a venue that are still worth listing (not finished).</summary>
+    public TavernGames.Core.Protocol.VenueTable[] TablesFor(string venueId) =>
+        _rooms.Values
+            .Where(r => r.VenueId == venueId)
+            .Select(r => r.Table)
+            .Where(t => t.Phase != TavernGames.Core.GamePhase.GameOver)
+            .OrderBy(t => t.Phase)
+            .ToArray();
 
     public bool TryGet(string code, out GameRoom room) =>
         _rooms.TryGetValue(code, out room!);

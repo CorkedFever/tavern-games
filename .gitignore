@@ -17,3 +17,9 @@ obj/
 ## OS
 Thumbs.db
 .DS_Store
+
+## Server data (profiles, venues, results)
+/src/TavernGames.Server/data/
+*.db
+*.db-wal
+*.db-shm

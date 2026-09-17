@@ -33,16 +33,39 @@ public sealed class GameRoom
     private readonly HashSet<string> _bots = new();
     private readonly Random _botRng = new();
     private readonly int _botDelayMs;
+    private readonly Action<GameResult>? _onResult;
     private int _botLoopActive;
+
+    // Profiles seated when the game began: the people a result is recorded for, even if they leave early.
+    private List<string> _seatedProfiles = [];
+    private bool _resultRecorded;
+    private volatile VenueTable _table;
 
     public string Code { get; }
     public string HostId { get; private set; } = "";
     public bool IsEmpty => _connections.IsEmpty && _spectators.IsEmpty;
 
-    public GameRoom(string code, IGameModule game, int turnDelayMs = 1500)
+    /// <summary>The venue hosting this table, or null for a private table.</summary>
+    public string? VenueId { get; }
+    public string? VenueName { get; }
+
+    /// <summary>A snapshot for venue listings. Safe to read from any thread.</summary>
+    public VenueTable Table => _table;
+
+    public GameRoom(
+        string code,
+        IGameModule game,
+        int turnDelayMs = 1500,
+        string? venueId = null,
+        string? venueName = null,
+        Action<GameResult>? onResult = null)
     {
         Code = code;
         _game = game;
+        VenueId = venueId;
+        VenueName = venueName;
+        _onResult = onResult;
+        _table = new VenueTable(code, game.GameType, "", 0, game.MaxPlayers, game.Phase);
 
         // Env var overrides the per-room pace (tests set it to 0 for instant play).
         _botDelayMs = int.TryParse(Environment.GetEnvironmentVariable("TAVERN_BOT_DELAY_MS"), out var ms)
@@ -129,6 +152,8 @@ public sealed class GameRoom
                 case StartGame:
                     RequireHost(conn, "start the game");
                     var opening = _game.Start();
+                    _seatedProfiles = _connections.Values
+                        .Select(c => c.ProfileId).OfType<string>().Distinct().ToList();
                     await BroadcastAsync(RoomUpdate());
                     await DeliverAsync(opening);
                     break;
@@ -246,8 +271,36 @@ public sealed class GameRoom
             throw new InvalidOperationException($"Only the host can {action}.");
     }
 
-    private RoomUpdate RoomUpdate() =>
-        new(Code, HostId, _game.GameType, _game.Phase, _game.Roster());
+    private RoomUpdate RoomUpdate()
+    {
+        var roster = _game.Roster();
+        RefreshTable(roster);
+        return new RoomUpdate(Code, HostId, _game.GameType, _game.Phase, roster, VenueName);
+    }
+
+    private void RefreshTable(PlayerPublic[] roster) =>
+        _table = new VenueTable(
+            Code, _game.GameType,
+            roster.FirstOrDefault(p => p.Id == HostId)?.Name ?? "",
+            roster.Length, _game.MaxPlayers, _game.Phase);
+
+    /// <summary>Reports a finished game once, for the profiles that sat down at the start.</summary>
+    private void RecordResult(GameEnded ended)
+    {
+        RefreshTable(ended.Players);
+        if (_resultRecorded || _onResult is null) return;
+        _resultRecorded = true;
+
+        var winnerProfile = _connections.TryGetValue(ended.WinnerId, out var winner) ? winner.ProfileId : null;
+        try
+        {
+            _onResult(new GameResult(VenueId, _game.GameType, _seatedProfiles, winnerProfile));
+        }
+        catch
+        {
+            // A bookkeeping failure must never break the table.
+        }
+    }
 
     private string NextBotName()
     {
@@ -263,6 +316,8 @@ public sealed class GameRoom
             switch (emit)
             {
                 case ToAll all:
+                    // Record before announcing, so anyone who reacts to "game over" sees the updated standings.
+                    if (all.Message is GameEnded ended) RecordResult(ended);
                     await BroadcastAsync(all.Message);
                     break;
                 case ToPlayer one when _connections.TryGetValue(one.PlayerId, out var conn):
@@ -284,3 +339,6 @@ public sealed class GameRoom
             await spectator.SendRawAsync(json);
     }
 }
+
+/// <summary>What a room reports when its game ends. <paramref name="WinnerProfileId"/> is null when a bot or guest won.</summary>
+public sealed record GameResult(string? VenueId, string GameType, IReadOnlyCollection<string> ProfileIds, string? WinnerProfileId);

@@ -2,9 +2,22 @@ using System.Net.WebSockets;
 using System.Text;
 using TavernGames.Core.Protocol;
 using TavernGames.Server;
+using TavernGames.Server.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton<RoomManager>();
+
+// Profiles, venues and results persist in one SQLite file (Tavern:DbPath, or env Tavern__DbPath).
+builder.Services.AddSingleton(sp =>
+{
+    var configured = sp.GetRequiredService<IConfiguration>()["Tavern:DbPath"];
+    var path = string.IsNullOrWhiteSpace(configured)
+        ? Path.Combine(sp.GetRequiredService<IHostEnvironment>().ContentRootPath, "data", "tavern.db")
+        : configured;
+    return new TavernDb(path);
+});
+builder.Services.AddSingleton<CommunityStore>();
+builder.Services.AddSingleton<CommunityHandler>();
 
 // Default to port 5050 (matches the plugin's default), overridable via ASPNETCORE_URLS.
 if (Environment.GetEnvironmentVariable("ASPNETCORE_URLS") is null)
@@ -17,7 +30,7 @@ app.UseWebSockets();
 app.MapGet("/", () => "Tavern Games relay server. Connect a WebSocket to /ws.");
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
-app.Map("/ws", async (HttpContext ctx, RoomManager rooms, ILoggerFactory logFactory) =>
+app.Map("/ws", async (HttpContext ctx, RoomManager rooms, CommunityStore community, CommunityHandler communityHandler, ILoggerFactory logFactory) =>
 {
     if (!ctx.WebSockets.IsWebSocketRequest)
     {
@@ -44,18 +57,35 @@ app.Map("/ws", async (HttpContext ctx, RoomManager rooms, ILoggerFactory logFact
             }
             if (message is null) continue;
 
+            // Profiles and venues work in or out of a room.
+            if (await communityHandler.TryHandleAsync(conn, message)) continue;
+
             // Room lifecycle messages are handled here; in-game messages delegate to the room.
             switch (message)
             {
                 case CreateRoom create when room is null:
                     try
                     {
-                        room = rooms.Create(create.GameType, create.Options, Math.Clamp(create.TurnDelayMs, 0, 5000));
+                        string? venueName = null;
+                        if (create.VenueId is { } venueId)
+                        {
+                            // Hosting for a venue is a staff privilege.
+                            var role = conn.ProfileId is { } host ? community.RoleOf(host, venueId) : null;
+                            if (role is null or VenueRole.Member)
+                                throw new InvalidOperationException("Only a venue's staff can host its tables.");
+                            venueName = community.VenueName(venueId);
+                        }
+
+                        room = rooms.Create(
+                            create.GameType, create.Options, Math.Clamp(create.TurnDelayMs, 0, 5000),
+                            create.VenueId, venueName,
+                            result => community.RecordResult(result.VenueId, result.GameType, result.ProfileIds, result.WinnerProfileId));
                         conn.RoomCode = room.Code;
-                        await room.AddPlayerAsync(conn, Sanitize(create.PlayerName));
+                        await room.AddPlayerAsync(conn, SeatName(conn, create.PlayerName));
                     }
                     catch (Exception ex)
                     {
+                        if (room is not null && room.IsEmpty) rooms.Remove(room.Code);
                         room = null;
                         conn.RoomCode = null;
                         await conn.SendAsync(new ErrorMessage(ex.Message));
@@ -67,9 +97,15 @@ app.Map("/ws", async (HttpContext ctx, RoomManager rooms, ILoggerFactory logFact
                     {
                         try
                         {
+                            // A venue's tables seat its members only (anyone may still spectate).
+                            if (target.VenueId is { } tableVenue &&
+                                (conn.ProfileId is not { } joiner || community.RoleOf(joiner, tableVenue) is null))
+                                throw new InvalidOperationException(
+                                    $"That table is hosted by {target.VenueName}. Join the venue to take a seat.");
+
                             room = target;
                             conn.RoomCode = room.Code;
-                            await room.AddPlayerAsync(conn, Sanitize(join.PlayerName));
+                            await room.AddPlayerAsync(conn, SeatName(conn, join.PlayerName));
                         }
                         catch (Exception ex)
                         {
@@ -103,7 +139,13 @@ app.Map("/ws", async (HttpContext ctx, RoomManager rooms, ILoggerFactory logFact
                     break;
 
                 case LeaveRoom:
-                    if (room is not null) { await LeaveAsync(rooms, room, conn); room = null; }
+                    if (room is not null)
+                    {
+                        await LeaveAsync(rooms, room, conn);
+                        room = null;
+                        conn.RoomCode = null;
+                        conn.IsSpectator = false; // free to take a seat at the next table
+                    }
                     break;
 
                 default:
@@ -133,12 +175,9 @@ static async Task LeaveAsync(RoomManager rooms, GameRoom room, ClientConnection 
     if (room.IsEmpty) rooms.Remove(room.Code);
 }
 
-static string Sanitize(string? name)
-{
-    name = (name ?? "").Trim();
-    if (name.Length == 0) return "Player";
-    return name.Length > 24 ? name[..24] : name;
-}
+// A profile's display name wins, so the name at the table matches the leaderboards.
+static string SeatName(ClientConnection conn, string? requested) =>
+    conn.DisplayName ?? CommunityStore.CleanName(requested);
 
 // Reassembles whole text frames (a single logical message may span several WebSocket frames).
 static async IAsyncEnumerable<string> ReadMessagesAsync(
