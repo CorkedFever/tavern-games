@@ -233,6 +233,62 @@ public sealed class CommunityStoreTests : IDisposable
     }
 
     [Fact]
+    public void OnlyCurrentMembers_EarnAPlaceOnTheBoard()
+    {
+        var a = NewProfile("Alice");
+        var b = NewProfile("Bob");
+        var c = NewProfile("Carol");
+        var venue = _store.CreateVenue(a, "The Gilded Moogle", "");
+        var code = _store.GetVenue(a, venue, []).JoinCode!;
+        _store.JoinVenue(b, code);
+        _store.JoinVenue(c, code);
+
+        _store.RecordResult(venue, "pig", [a, b, c], winnerProfileId: c);
+        _store.Kick(a, venue, c); // removed after winning: comes off the board
+
+        Assert.Equal(["Alice", "Bob"], _store.Leaderboard(a, venue, null).Select(r => r.DisplayName).Order());
+
+        // And someone removed DURING a game isn't credited for it at all.
+        _store.RecordResult(venue, "pig", [a, b, c], winnerProfileId: c);
+        _store.JoinVenue(c, code);
+        var carol = _store.Leaderboard(a, venue, null).Single(r => r.DisplayName == "Carol");
+        Assert.Equal((1, 1), (carol.Played, carol.Won)); // only the game she was a member for
+    }
+
+    [Fact]
+    public void AResultForADeletedVenueOrProfile_IsStillRecordedSafely()
+    {
+        var a = NewProfile("Alice");
+        var b = NewProfile("Bob");
+        var venue = _store.CreateVenue(a, "Short Lived", "");
+        _store.JoinVenue(b, _store.GetVenue(a, venue, []).JoinCode!);
+        _store.DeleteVenue(a, venue);
+        _store.DeleteProfile(b);
+
+        _store.RecordResult(venue, "pig", [a, b], winnerProfileId: a); // the table outlived both
+
+        var stat = Assert.Single(_store.Stats(a));
+        Assert.Equal((1, 1), (stat.Played, stat.Won));
+    }
+
+    [Fact]
+    public void AbandonedProfiles_ArePurged_ButAnyoneWithAFootprintIsKept()
+    {
+        var drifter = NewProfile("Drifter");
+        var member = NewProfile("Member");
+        var player = NewProfile("Player");
+        _store.CreateVenue(member, "The Gilded Moogle", "");
+        _store.RecordResult(null, "pig", [player], winnerProfileId: player);
+
+        Assert.Equal(0, _store.PurgeAbandonedProfiles(DateTime.UtcNow.AddDays(-30))); // all seen just now
+        Assert.Equal(1, _store.PurgeAbandonedProfiles(DateTime.UtcNow.AddMinutes(1))); // "not seen since the future"
+
+        Assert.Empty(_store.Stats(drifter));
+        Assert.Single(_store.VenuesFor(member));
+        Assert.Single(_store.Stats(player));
+    }
+
+    [Fact]
     public void ReopeningTheDatabase_KeepsEverything()
     {
         var (profile, token) = _store.Identify(null, "Mina");

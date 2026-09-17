@@ -33,7 +33,7 @@ public sealed class GameClient(IPluginLog log) : IDisposable
 
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme is not ("ws" or "wss"))
         {
-            LastError = "Invalid server URL — expected ws://host:port/path.";
+            LastError = "Invalid server URL. Expected ws://host:port/path.";
             State = ConnectionState.Disconnected;
             return;
         }
@@ -54,7 +54,7 @@ public sealed class GameClient(IPluginLog log) : IDisposable
         }
         catch (OperationCanceledException)
         {
-            LastError = "Connection timed out — is the server running?";
+            LastError = "Connection timed out. Is the server running?";
             State = ConnectionState.Disconnected;
             await DisconnectAsync();
         }

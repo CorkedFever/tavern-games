@@ -197,6 +197,19 @@ public class CardKitTests
     }
 
     [Fact]
+    public void ChipsAreNeverSilentlyLost()
+    {
+        // Everyone folded with chips in: that can't happen in a real hand, so it must not pass quietly.
+        Assert.Throws<ArgumentException>(() =>
+            PotMath.BuildPots([new("a", 100, true), new("b", 100, true), new("c", 0, false)]));
+        Assert.Empty(PotMath.BuildPots([new("a", 0, false), new("b", 0, true)])); // nothing in, nothing to build
+
+        // A pot whose only eligible player has no hand on record.
+        var pots = new List<Pot> { new(300, ["a"]) };
+        Assert.Throws<ArgumentException>(() => PotMath.Award(pots, new Dictionary<string, HandValue>(), ["a"]));
+    }
+
+    [Fact]
     public void TheBestHand_WinsOnlyThePotsItIsEligibleFor()
     {
         var pots = PotMath.BuildPots([new("short", 50, false), new("big", 200, false), new("mid", 200, false)]);

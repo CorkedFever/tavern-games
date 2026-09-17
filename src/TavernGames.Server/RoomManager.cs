@@ -25,7 +25,7 @@ public sealed class RoomManager
         Action<GameResult>? onResult = null)
     {
         if (_rooms.Count >= _maxRooms)
-            throw new InvalidOperationException("The server is at capacity — please try again later.");
+            throw new InvalidOperationException("The server is at capacity. Please try again later.");
 
         for (var attempt = 0; attempt < 10; attempt++)
         {
@@ -45,6 +45,16 @@ public sealed class RoomManager
             .Where(t => t.Phase != TavernGames.Core.GamePhase.GameOver)
             .OrderBy(t => t.Phase)
             .ToArray();
+
+    /// <summary>Removes a profile from every table a venue is hosting (they left, or were removed from, the venue).</summary>
+    public async Task EvictFromVenueTablesAsync(string venueId, string profileId, string reason)
+    {
+        foreach (var room in _rooms.Values.Where(r => r.VenueId == venueId).ToList())
+        {
+            await room.EvictProfileAsync(profileId, reason);
+            if (room.IsEmpty) Remove(room.Code);
+        }
+    }
 
     public bool TryGet(string code, out GameRoom room) =>
         _rooms.TryGetValue(code, out room!);

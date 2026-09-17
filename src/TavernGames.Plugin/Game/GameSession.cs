@@ -99,6 +99,11 @@ public sealed class GameSession(IReadOnlyList<IClientGame> games)
                 AddLog($"Game over. {NameOf(ended.WinnerId)} wins!");
                 break;
 
+            case RemovedFromRoom removed:
+                Reset();
+                AddLog(removed.Reason);
+                break;
+
             case ErrorMessage error:
                 AddLog($"[error] {error.Text}");
                 break;

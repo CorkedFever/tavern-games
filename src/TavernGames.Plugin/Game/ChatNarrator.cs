@@ -12,6 +12,7 @@ public static class ChatNarrator
     public static string? BuildLine(NetMessage message, GameSession session) => message switch
     {
         GameEnded g => $"{session.NameOf(g.WinnerId)} takes the table. Victory!",
+        RemovedFromRoom r => $"[Tavern Games] {r.Reason}",
         ErrorMessage e => $"[Tavern Games] {e.Text}",
         _ => session.ActiveGame?.Narrate(message, session),
     };

@@ -54,16 +54,31 @@ public sealed class MainWindow : Window
     private Game.GameClient Client => _plugin.Client;
     private Game.GameSession Session => _plugin.Session;
 
-    public override void Draw()
+    private string _lastDrawError = "";
+
+    public override void Draw() => Guarded("window", DrawContent);
+
+    /// <summary>
+    /// Runs one section of the UI so that a bug in it can't take the window down. Each
+    /// section is guarded from INSIDE whatever ImGui scope contains it (a tab item, the
+    /// window), so when it throws, the enclosing End call still runs and ImGui's stack
+    /// stays balanced. The same error is logged once, not once per frame.
+    /// </summary>
+    private void Guarded(string section, Action draw)
     {
         try
         {
-            DrawContent();
+            draw();
         }
         catch (Exception ex)
         {
-            Plugin.Log.Error(ex, "Tavern Games: UI draw error.");
-            ImGui.TextColored(TableUi.Red, "A UI error occurred. See /xllog for details.");
+            var signature = $"{section}: {ex.GetType().Name}: {ex.Message}";
+            if (signature != _lastDrawError)
+            {
+                _lastDrawError = signature;
+                Plugin.Log.Error(ex, "Tavern Games: UI error while drawing {Section}.", section);
+            }
+            ImGui.TextColored(TableUi.Red, "A UI error occurred here. See /xllog for details.");
         }
     }
 
@@ -89,7 +104,7 @@ public sealed class MainWindow : Window
                     DrawRoomLobby();
                     break;
                 case GamePhase.Playing when Session.ActiveGame is { } game:
-                    game.DrawTable(Session, Client.Send);
+                    Guarded(game.GameType, () => game.DrawTable(Session, Client.Send));
                     break;
                 case GamePhase.Playing:
                     ImGui.TextColored(TableUi.Red, $"This plugin version doesn't know the game '{Session.GameType}'. Update to play it.");
@@ -153,17 +168,17 @@ public sealed class MainWindow : Window
         _jumpToPlayTab = false;
         if (ImGui.BeginTabItem("Play", playFlags))
         {
-            DrawPlayTab();
+            Guarded("play tab", DrawPlayTab);
             ImGui.EndTabItem();
         }
         if (ImGui.BeginTabItem("Venues"))
         {
-            _venuesTab.Draw();
+            Guarded("venues tab", _venuesTab.Draw);
             ImGui.EndTabItem();
         }
         if (ImGui.BeginTabItem("Profile"))
         {
-            _profileTab.Draw();
+            Guarded("profile tab", _profileTab.Draw);
             ImGui.EndTabItem();
         }
         ImGui.EndTabBar();

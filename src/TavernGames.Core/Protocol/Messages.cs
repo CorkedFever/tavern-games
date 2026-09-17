@@ -35,6 +35,7 @@ public abstract record NetMessage
         (typeof(SpectateAccepted), "spectateAccepted"),
         (typeof(RoomUpdate), "roomUpdate"),
         (typeof(GameEnded), "gameEnded"),
+        (typeof(RemovedFromRoom), "removedFromRoom"),
         // Profiles and venues, client -> server
         (typeof(Hello), "hello"),
         (typeof(UpdateProfile), "profile.update"),
@@ -144,3 +145,9 @@ public sealed record RoomUpdate(
 
 /// <summary>The game is over. Shared by every game.</summary>
 public sealed record GameEnded(string WinnerId, PlayerPublic[] Players) : NetMessage;
+
+/// <summary>
+/// The server took this connection out of its room (for example, it was removed from the
+/// venue hosting the table). The client should return to the lobby and show the reason.
+/// </summary>
+public sealed record RemovedFromRoom(string Reason) : NetMessage;

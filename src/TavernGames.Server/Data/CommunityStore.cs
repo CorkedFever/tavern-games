@@ -95,6 +95,23 @@ public sealed class CommunityStore(TavernDb db)
         connection.Execute("DELETE FROM profiles WHERE id = $id", ("$id", profileId));
     }
 
+    /// <summary>
+    /// Deletes profiles nobody is using: no venue membership, no recorded game, and not seen
+    /// since <paramref name="notSeenSince"/>. Returns how many were removed.
+    /// </summary>
+    public int PurgeAbandonedProfiles(DateTime notSeenSince)
+    {
+        using var connection = db.Open();
+        return connection.Execute(
+            """
+            DELETE FROM profiles
+            WHERE last_seen_at < $cutoff
+              AND NOT EXISTS (SELECT 1 FROM venue_members m WHERE m.profile_id = profiles.id)
+              AND NOT EXISTS (SELECT 1 FROM game_result_players p WHERE p.profile_id = profiles.id)
+            """,
+            ("$cutoff", notSeenSince.ToUniversalTime().ToString("O")));
+    }
+
     // ------------------------------------------------------------------ venues
 
     public VenueSummary[] VenuesFor(string profileId)
@@ -186,9 +203,12 @@ public sealed class CommunityStore(TavernDb db)
         using var connection = db.Open();
         var myRole = RequireMember(connection, profileId, venueId);
 
-        var (name, description, code) = connection.Query(
+        var row = connection.Query(
             "SELECT name, description, join_code FROM venues WHERE id = $id",
-            row => (row.GetString(0), row.GetString(1), row.GetString(2)), ("$id", venueId)).Single();
+            r => (Name: r.GetString(0), Description: r.GetString(1), Code: r.GetString(2)), ("$id", venueId));
+        if (row.Count == 0)
+            throw new InvalidOperationException("That venue no longer exists.");
+        var (name, description, code) = row[0];
 
         var members = connection.Query(
             """
@@ -265,6 +285,25 @@ public sealed class CommunityStore(TavernDb db)
         if (profileIds.Count == 0) return;
 
         using var connection = db.Open();
+
+        if (venueId is not null)
+        {
+            // The venue may have been deleted, and a seated player may have left or been removed
+            // from it, while the game was running. Membership is what earns a place on its board.
+            var venueExists = connection.Scalar<long>("SELECT COUNT(*) FROM venues WHERE id = $id", ("$id", venueId)) > 0;
+            if (!venueExists)
+                venueId = null;
+            else
+                profileIds = profileIds.Where(id => RoleOf(connection, id, venueId) is not null).ToList();
+            if (profileIds.Count == 0) return;
+        }
+
+        // A profile deleted mid-game can't be credited (and would break the foreign key).
+        profileIds = profileIds
+            .Where(id => connection.Scalar<long>("SELECT COUNT(*) FROM profiles WHERE id = $id", ("$id", id)) > 0)
+            .ToList();
+        if (profileIds.Count == 0) return;
+
         using var transaction = connection.BeginTransaction();
         var resultId = connection.Scalar<long>(
             """
@@ -281,7 +320,15 @@ public sealed class CommunityStore(TavernDb db)
         transaction.Commit();
     }
 
-    /// <summary>Members only. Ranked games only. Most wins first; ties go to whoever needed fewer games.</summary>
+    /// <summary>
+    /// Members only, and only current members appear on it, so removing someone from a venue
+    /// also takes them off its board. Ranked games only. Most wins first; ties go to whoever
+    /// needed fewer games.
+    ///
+    /// A leaderboard is a venue's own record among people its staff chose to admit. "Two real
+    /// players" is counted in profiles, and one person can hold two, so the defence against a
+    /// farmed board is the venue's membership, not this query.
+    /// </summary>
     public LeaderboardRow[] Leaderboard(string profileId, string venueId, string? gameType)
     {
         using var connection = db.Open();
@@ -293,6 +340,7 @@ public sealed class CommunityStore(TavernDb db)
             FROM game_results r
             JOIN game_result_players p ON p.result_id = r.id
             JOIN profiles pr ON pr.id = p.profile_id
+            JOIN venue_members vm ON vm.venue_id = r.venue_id AND vm.profile_id = p.profile_id
             WHERE r.venue_id = $venue AND r.human_count >= $ranked
               AND ($game IS NULL OR r.game_type = $game)
             GROUP BY pr.id, pr.display_name

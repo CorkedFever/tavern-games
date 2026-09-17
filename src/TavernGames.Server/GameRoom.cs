@@ -13,7 +13,11 @@ namespace TavernGames.Server;
 /// Every state change and the delivery of its results happen under <see cref="_turn"/>,
 /// a single async gate. That keeps the module single-threaded and guarantees the table
 /// sees each move's messages in order, even though sockets fire independently (and even
-/// through a between-rounds pause).
+/// through a between-rounds pause). Holding the gate through a pause is deliberate: the
+/// module's state has already moved on to the next round, so a move let in mid-pause
+/// would be broadcast before the messages that explain it. The price is that input
+/// (including leaving) waits out the pause, a few seconds at most. Delivery itself can't
+/// stall the gate: a send never throws and gives up on a socket after a short timeout.
 ///
 /// Bots are seats with no connection. After any action <see cref="DriveBotsAsync"/>
 /// plays the game forward for as long as the seat on the clock is a bot.
@@ -106,6 +110,21 @@ public sealed class GameRoom
         finally
         {
             _turn.Release();
+        }
+    }
+
+    /// <summary>
+    /// Takes every seat held by <paramref name="profileId"/> away from the table, telling
+    /// that player why. Used when someone stops being a member of the hosting venue: a
+    /// door check at join time is not enough, since they may already be sitting down.
+    /// </summary>
+    public async Task EvictProfileAsync(string profileId, string reason)
+    {
+        foreach (var conn in _connections.Values.Where(c => c.ProfileId == profileId).ToList())
+        {
+            conn.Room = null; // their next message must not be routed to this table
+            await conn.SendAsync(new RemovedFromRoom(reason));
+            await RemoveConnectionAsync(conn.PlayerId);
         }
     }
 

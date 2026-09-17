@@ -8,7 +8,7 @@ namespace TavernGames.Server;
 /// is lives on the <see cref="ClientConnection"/>, and what they may do is decided by
 /// the <see cref="CommunityStore"/>.
 /// </summary>
-public sealed class CommunityHandler(CommunityStore store, RoomManager rooms)
+public sealed class CommunityHandler(CommunityStore store, RoomManager rooms, ILogger<CommunityHandler> log)
 {
     /// <summary>Returns false if the message isn't a profile or venue message.</summary>
     public async Task<bool> TryHandleAsync(ClientConnection conn, NetMessage message)
@@ -24,7 +24,13 @@ public sealed class CommunityHandler(CommunityStore store, RoomManager rooms)
         }
         catch (InvalidOperationException ex)
         {
-            await conn.SendAsync(new ErrorMessage(ex.Message));
+            await conn.SendAsync(new ErrorMessage(ex.Message)); // a rule said no; the message is written for the player
+        }
+        catch (Exception ex)
+        {
+            // Anything else (a locked database, a bug) must neither drop the player nor leak internals to them.
+            log.LogError(ex, "Community message {Message} failed for connection {Id}", message.GetType().Name, conn.PlayerId);
+            await conn.SendAsync(new ErrorMessage("Something went wrong on the server. Please try again."));
         }
         return true;
     }
@@ -75,6 +81,7 @@ public sealed class CommunityHandler(CommunityStore store, RoomManager rooms)
 
             case LeaveVenue leave:
                 store.LeaveVenue(me, leave.VenueId);
+                await rooms.EvictFromVenueTablesAsync(leave.VenueId, me, "You left the venue hosting that table.");
                 await conn.SendAsync(new VenueList(store.VenuesFor(me)));
                 break;
 
@@ -104,6 +111,7 @@ public sealed class CommunityHandler(CommunityStore store, RoomManager rooms)
 
             case KickFromVenue kick:
                 store.Kick(me, kick.VenueId, kick.ProfileId);
+                await rooms.EvictFromVenueTablesAsync(kick.VenueId, kick.ProfileId, "You were removed from the venue hosting that table.");
                 await SendVenueAsync(conn, me, kick.VenueId, listChanged: true);
                 break;
 

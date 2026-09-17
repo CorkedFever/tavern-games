@@ -18,7 +18,13 @@ public static class PotMath
     {
         var live = stakes.Where(s => !s.Folded && s.Contributed > 0).ToList();
         if (live.Count == 0)
-            return [];
+        {
+            // Nobody left to win it. With no chips in, there's simply no pot; with chips in, the
+            // caller has folded everyone (a hand always has a last player standing), and quietly
+            // returning nothing would make those chips vanish.
+            if (stakes.Sum(s => s.Contributed) == 0) return [];
+            throw new ArgumentException("There are chips in the pot but nobody left to win them.", nameof(stakes));
+        }
 
         var pots = new List<Pot>();
         var previous = 0;
@@ -62,7 +68,9 @@ public static class PotMath
         foreach (var pot in pots)
         {
             var contenders = pot.Eligible.Where(hands.ContainsKey).ToList();
-            if (contenders.Count == 0) continue;
+            if (contenders.Count == 0)
+                throw new ArgumentException(
+                    $"A pot of {pot.Amount} has no eligible player with a hand, so its chips would be lost.", nameof(hands));
 
             var best = contenders.Max(id => hands[id].Score);
             var winners = contenders
