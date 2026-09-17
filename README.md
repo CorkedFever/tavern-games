@@ -5,7 +5,7 @@ a table of tavern games in your game window, plus the relay server that connects
 players. Open a room, share the code, fill empty seats with bots, and let onlookers
 spectate.
 
-**Games so far:** Liar's Dice, Pig, Blackjack.
+**Games so far:** Liar's Dice, Pig, Blackjack, Texas Hold'em.
 
 > Like all Dalamud plugins, this is a third-party tool and using it is against the
 > FFXIV Terms of Service. Build and run at your own risk. Wagers are flavor only: the
@@ -129,3 +129,16 @@ seat order: hit, stand, or double down on the first two cards. The dealer's seco
 stays face down until the players are done, then the dealer draws to 17 (standing on
 soft 17). Blackjack pays 3:2. After the set number of rounds the biggest stack wins;
 ties go to the earlier seat. No splitting or insurance.
+
+**Texas Hold'em** (2-6 players). A no-limit sit-and-go: everyone starts with the same
+stack and plays until one seat holds every chip. Two cards each, then a five card board
+dealt as the flop, the turn and the river, with a betting round before each and a
+showdown at the end. The dealer button moves one live seat per hand and the two seats to
+its left post the blinds, which double every so many hands (or never, if you set that to
+zero); heads-up the button posts the small blind, acts first before the flop and last on
+every later street. The minimum raise is the size of the last bet or raise on the street:
+an all-in for less than that is allowed, but it does not reopen the betting for anyone who
+has already acted. Chips no opponent could match are handed back rather than won, side
+pots pay each seat only what it covered, and a split that does not divide evenly gives the
+odd chips to the tied seats nearest the button's left. A seat with nothing left after a
+hand is out. Only the hands that reach a showdown are ever shown.
