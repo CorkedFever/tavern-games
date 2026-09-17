@@ -142,13 +142,7 @@ public static class PokerHand
         }
     }
 
-    private static string Name(Rank rank) => rank switch
-    {
-        Rank.Ace => "Ace", Rank.King => "King", Rank.Queen => "Queen", Rank.Jack => "Jack",
-        Rank.Ten => "Ten", Rank.Nine => "Nine", Rank.Eight => "Eight", Rank.Seven => "Seven",
-        Rank.Six => "Six", Rank.Five => "Five", Rank.Four => "Four", Rank.Three => "Three",
-        _ => "Two",
-    };
+    private static string Name(Rank rank) => Card.RankName(rank);
 
     private static string Plural(Rank rank) => rank == Rank.Six ? "Sixes" : Name(rank) + "s";
 }

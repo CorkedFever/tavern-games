@@ -1,3 +1,4 @@
+using TavernGames.Core.Games.Blackjack;
 using TavernGames.Core.Games.LiarsDice;
 using TavernGames.Core.Games.Pig;
 
@@ -40,6 +41,7 @@ public static class GameCatalog
     [
         LiarsDiceModule.Descriptor,
         PigModule.Descriptor,
+        BlackjackModule.Descriptor,
     ];
 
     public static GameDescriptor? Find(string? type) =>

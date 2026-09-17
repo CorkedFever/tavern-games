@@ -5,7 +5,7 @@ a table of tavern games in your game window, plus the relay server that connects
 players. Open a room, share the code, fill empty seats with bots, and let onlookers
 spectate.
 
-**Games so far:** Liar's Dice, Pig.
+**Games so far:** Liar's Dice, Pig, Blackjack.
 
 > Like all Dalamud plugins, this is a third-party tool and using it is against the
 > FFXIV Terms of Service. Build and run at your own risk. Wagers are flavor only: the
@@ -71,6 +71,13 @@ Back that file up and you've backed up everything.
 
 No platform code changes. Pig was added this way as the proof.
 
+**Card games** build on `TavernGames.Core/Cards`: `Card` (two-character wire codes, `"??"`
+for a card the receiver may not see), `Deck` (cryptographic shuffle, or `Deck.Stacked` for
+tests), `PokerHand` (best five of up to seven cards, comparable, with a spoken
+description) and `PotMath` (main and side pots, split pots, odd chips). The plugin's
+`CardRenderer` draws cards and card backs. Chips are play money that exist only for the
+length of a table.
+
 ## Build
 
 Requires the **.NET 10 SDK**. The plugin additionally needs the Dalamud dev libraries,
@@ -116,3 +123,9 @@ wins.
 **Pig** (2-6 players). On your turn roll one die as often as you dare, adding each roll
 to the pot. Hold to bank the pot; roll a 1 and the pot is lost. First to the target
 score (default 100) wins.
+
+**Blackjack** (1-5 players against the house). Everyone bets, then plays their hand in
+seat order: hit, stand, or double down on the first two cards. The dealer's second card
+stays face down until the players are done, then the dealer draws to 17 (standing on
+soft 17). Blackjack pays 3:2. After the set number of rounds the biggest stack wins;
+ties go to the earlier seat. No splitting or insurance.

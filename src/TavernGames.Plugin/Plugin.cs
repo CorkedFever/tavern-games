@@ -22,7 +22,7 @@ public sealed class Plugin : IDalamudPlugin
 
     internal Configuration Config { get; }
     internal GameClient Client { get; }
-    internal GameSession Session { get; } = new([new LiarsDiceClient(), new PigClient()]);
+    internal GameSession Session { get; } = new([new LiarsDiceClient(), new PigClient(), new BlackjackClient()]);
     internal AccountState Account { get; } = new();
 
     private ConnectionState _lastConnectionState = ConnectionState.Disconnected;

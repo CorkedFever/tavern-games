@@ -51,5 +51,19 @@ public readonly record struct Card(Rank Rank, Suit Suit)
         return true;
     }
 
+    /// <summary>Spoken form, for logs and narration: "Nine of Clubs".</summary>
+    public string Name => $"{RankName(Rank)} of {Suit}";
+
+    public static string RankName(Rank rank) => rank switch
+    {
+        Rank.Ace => "Ace", Rank.King => "King", Rank.Queen => "Queen", Rank.Jack => "Jack",
+        Rank.Ten => "Ten", Rank.Nine => "Nine", Rank.Eight => "Eight", Rank.Seven => "Seven",
+        Rank.Six => "Six", Rank.Five => "Five", Rank.Four => "Four", Rank.Three => "Three",
+        _ => "Two",
+    };
+
+    /// <summary>Spoken form of a wire code; a hidden or malformed code reads as "a face-down card".</summary>
+    public static string NameOf(string? code) => TryParse(code, out var card) ? card.Name : "a face-down card";
+
     public override string ToString() => Code;
 }
