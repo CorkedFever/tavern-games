@@ -63,7 +63,8 @@ public sealed record MiaBelieved(string PlayerId, int Value, MiaTable Table) : N
 /// <summary>
 /// A call, with the dice it exposed. <paramref name="Honest"/> means the roll reached the
 /// announcement, which costs the caller instead of the announcer. A Mia costs two lives
-/// either way, so <paramref name="LivesLost"/> carries the price.
+/// either way, so <paramref name="LivesLost"/> carries what the loser actually paid: two
+/// for a Mia, one otherwise, and one when a Mia took the last life they had.
 /// </summary>
 public sealed record MiaCalled(
     string CallerId,

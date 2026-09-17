@@ -6,15 +6,16 @@ namespace TavernGames.Core.Games.Mia;
 /// The tavern's Mia player: it counts the 36 ways two dice can land, tells the truth
 /// while the truth is good enough, and invents the smallest lie it thinks will pass.
 /// Every number it leans on comes from <see cref="MiaValue.ChanceAtLeast"/>, shaded by
-/// how hard the table had squeezed the announcer, and nudged by a little noise so a
-/// human cannot read it off a table.
+/// how hard the table had squeezed the announcer. The read then sets the odds of a call
+/// rather than the answer itself, so no claim gets the same answer every time and a human
+/// cannot learn a line that always works.
 /// </summary>
 public static class MiaBot
 {
     // --- answering an announcement ---
-    private const double CallBelow = 0.30;      // call when the claim looks less likely than this
+    private const double CallBelow = 0.30;      // the read at which a call is an even-money choice
     private const double PressureWeight = 0.35; // how much a high accepted value argues "they had to lie"
-    private const double Noise = 0.18;          // +/- half of this on every read
+    private const double Temperature = 0.20;    // how sharply the odds swing as the read crosses CallBelow
 
     // --- answering a Mia ---
     private const double VolunteeredMia = 5.0;  // a Mia nobody was forced into is real more often than base rate
@@ -65,7 +66,7 @@ public static class MiaBot
         var announced = game.Announced!.Value;
         if (announced.IsMia) return AnswerMia(game, self, rng);
 
-        return Believability(announced, game.Accepted, rng) < CallBelow
+        return rng.NextDouble() < CallChance(Believability(announced, game.Accepted))
             ? new MiaCallLiar()
             : new MiaBelieve();
     }
@@ -91,16 +92,26 @@ public static class MiaBot
 
     /// <summary>
     /// The read on an announcement: the exact chance a fresh throw reaches it, shaded down
-    /// by how far the table had already pushed the announcer, plus a little noise so the
-    /// table cannot read the bot the way the bot reads them.
+    /// by how far the table had already pushed the announcer. A player forced to beat a high
+    /// value had to say something, so their claim means less than the odds alone suggest.
     /// </summary>
-    private static double Believability(MiaValue announced, MiaValue? accepted, Random rng)
+    private static double Believability(MiaValue announced, MiaValue? accepted)
     {
         var honest = announced.ChanceAtLeast;
         var pressure = accepted is { } value ? 1.0 - value.ChanceAtLeast : 0.0;
-        var noise = (rng.NextDouble() - 0.5) * Noise;
-        return Math.Clamp(honest * (1.0 - PressureWeight * pressure) + noise, 0.0, 1.0);
+        return honest * (1.0 - PressureWeight * pressure);
     }
+
+    /// <summary>
+    /// How often a read of <paramref name="believability"/> is worth a call. A plain
+    /// threshold would turn the bot into a lookup table: find the claim it always believes
+    /// and you can open every round with it and never be called again. Softening the
+    /// threshold into odds buys a bot nobody can read, and the price is a little accuracy
+    /// at the ends of the ladder, where it will now and then call a claim that cannot be
+    /// a lie.
+    /// </summary>
+    private static double CallChance(double believability) =>
+        1.0 / (1.0 + Math.Exp((believability - CallBelow) / Temperature));
 
     /// <summary>True when the announcer's only legal claim was Mia, so the claim says nothing.</summary>
     private static bool OnlyMiaWasLeft(MiaValue? accepted) =>

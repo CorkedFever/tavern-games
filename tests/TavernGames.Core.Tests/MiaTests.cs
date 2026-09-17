@@ -70,6 +70,17 @@ public class MiaTests
     }
 
     [Fact]
+    public void DiceThatCouldNeverBeThrown_AreNotAValueEither()
+    {
+        // The two-digit code on its own would call this double 1s: -5 and 61 add up to 11.
+        var impossible = new MiaValue(-5, 61);
+
+        Assert.Equal(11, impossible.Code);
+        Assert.Equal(-1, impossible.Rank);
+        Assert.False(impossible.IsValid);
+    }
+
+    [Fact]
     public void TheOdds_MatchAllThirtySixWaysTheDiceCanLand()
     {
         foreach (var value in MiaValue.Ordered)
@@ -264,9 +275,10 @@ public class MiaTests
         var game = Started(1, [2, 1]); // A has a real Mia; B calls it on his last life
         game.Announce("a", MiaValue.Mia);
 
-        game.CallLiar("b");
+        var called = game.CallLiar("b").First(e => e.Kind == MiaEventKind.Called);
 
         Assert.Equal(0, Lives(game, "b")); // not -1
+        Assert.Equal(1, called.LivesLost); // and the table hears the one life it really cost
         Assert.Equal("a", game.WinnerId);
     }
 
@@ -505,12 +517,22 @@ public class MiaTests
     public void Bots_AlwaysProduceLegalMoves_AndGamesFinish()
     {
         var rng = new Random(5);
+        var climbed = -1;
+
         for (var trial = 0; trial < 40; trial++)
         {
-            var (module, _) = PlayItOut(2 + trial % 5, lives: 1 + trial % 3, seed: 100 + trial, rng);
+            var (module, emits) = PlayItOut(2 + trial % 5, lives: 1 + trial % 3, seed: 100 + trial, rng);
             Assert.Equal(GamePhase.GameOver, module.Phase);
             Assert.Null(module.CurrentActorId);
+
+            climbed = emits.OfType<ToAll>().Select(e => e.Message).OfType<MiaBelieved>()
+                .Select(m => MiaValue.FromCode(m.Value).Rank).Append(climbed).Max();
         }
+
+        // Double sixes believed is the top of the ladder, and the corner where the next
+        // player's only legal claim is Mia. If the bots ever stop climbing that far this
+        // fuzz has quietly stopped covering the corner, which is worth being told about.
+        Assert.Equal(V(66).Rank, climbed);
     }
 
     [Fact]
@@ -529,6 +551,61 @@ public class MiaTests
             game.Announce("a", MiaValue.Mia);
             return MiaBot.Decide(game, game.Players.First(p => p.Id == "b"), new Random(seed));
         }
+    }
+
+    /// <summary>
+    /// A responder that answers any one claim the same way every time is a line a human can
+    /// play forever: find the claim it always believes, open every round with it, and never
+    /// be called again. So the read has to set the odds of a call rather than the answer,
+    /// and every rung of the ladder, against every value that could already have been
+    /// believed, has to draw both answers out of the bot.
+    /// </summary>
+    [Fact]
+    public void TheBotsAnswer_IsNeverACertainty_AnywhereOnTheLadder()
+    {
+        const int samples = 400;
+        var stubborn = new List<string>();
+
+        foreach (var accepted in EveryAcceptedValue())
+            foreach (var announced in Answerable(accepted))
+            {
+                // One stream per spot, so the samples are a real run of draws rather than
+                // 400 first-draws off 400 fresh generators.
+                var rng = new Random(announced.Code * 100 + (accepted?.Code ?? 0));
+                var calls = 0;
+                for (var i = 0; i < samples; i++)
+                {
+                    var (game, bot) = Answering(accepted, announced);
+                    if (MiaBot.Decide(game, bot, rng) is MiaCallLiar) calls++;
+                }
+
+                if (calls == 0 || calls == samples)
+                    stubborn.Add($"{accepted?.Describe() ?? "opening"}/{announced.Describe()} called {calls}/{samples}");
+            }
+
+        Assert.True(stubborn.Count == 0, $"the bot is readable at: {string.Join(", ", stubborn)}");
+    }
+
+    /// <summary>
+    /// A cornered announcer is the one place the bot could invent something illegal, and the
+    /// corners are exactly what a bot-only fuzz never reaches: nobody believes double sixes
+    /// often enough to force somebody into Mia. So the ladder is walked by hand instead,
+    /// every rung against every throw the dice can make.
+    /// </summary>
+    [Fact]
+    public void TheBot_AnnouncesSomethingLegal_FromEveryRungAgainstEveryThrow()
+    {
+        foreach (var accepted in EveryAcceptedValue())
+            for (var a = 1; a <= 6; a++)
+                for (var b = 1; b <= 6; b++)
+                    for (var seed = 0; seed < 8; seed++)
+                    {
+                        var (game, bot) = Cornered(accepted, a, b);
+                        var move = Assert.IsType<MiaAnnounce>(MiaBot.Decide(game, bot, new Random(seed)));
+
+                        // Announce is the judge: an illegal claim throws, and the test fails.
+                        game.Announce(bot.Id, MiaValue.FromCode(move.Value));
+                    }
     }
 
     [Fact]
@@ -625,6 +702,51 @@ public class MiaTests
     }
 
     // ---------------------------------------------------------------- helpers
+
+    /// <summary>
+    /// Everything the standing accepted value can be when somebody is on the clock: nothing
+    /// yet at the head of a round, or any value that could have been believed. Mia is not
+    /// among them because a Mia can only be called or conceded, never taken at its word.
+    /// </summary>
+    private static IEnumerable<MiaValue?> EveryAcceptedValue() =>
+        MiaValue.Ordered.Where(v => !v.IsMia).Select(v => (MiaValue?)v).Prepend(null);
+
+    /// <summary>Every claim a responder can be facing over <paramref name="accepted"/>, Mia aside: that one has its own answer.</summary>
+    private static IEnumerable<MiaValue> Answerable(MiaValue? accepted) =>
+        MiaValue.Ordered.Where(v => !v.IsMia && (accepted is not { } floor || v.Beats(floor)));
+
+    /// <summary>A table where <paramref name="announced"/> has just been claimed and the returned seat owes an answer.</summary>
+    private static (MiaGame Game, MiaPlayer Bot) Answering(MiaValue? accepted, MiaValue announced)
+    {
+        // The responder never sees its own dice, so what the cup holds is irrelevant here.
+        if (accepted is not { } floor)
+        {
+            var opened = Started(3, [1, 1]);
+            opened.Announce("a", announced);
+            return (opened, opened.Players.First(p => p.Id == "b"));
+        }
+
+        var game = Started(3, [1, 1, 1, 1]);
+        game.Announce("a", floor);
+        game.Believe("b"); // now A owes the answer and B is the announcer
+        game.Announce("b", announced);
+        return (game, game.Players.First(p => p.Id == "a"));
+    }
+
+    /// <summary>A table where <paramref name="accepted"/> stands and the returned seat holds that throw and owes a claim.</summary>
+    private static (MiaGame Game, MiaPlayer Bot) Cornered(MiaValue? accepted, int a, int b)
+    {
+        if (accepted is not { } floor)
+        {
+            var opened = Started(3, [a, b]);
+            return (opened, opened.Players.First(p => p.Id == "a"));
+        }
+
+        var game = Started(3, [1, 1, a, b]); // A's throw never matters; B takes the cup and the dice
+        game.Announce("a", floor);
+        game.Believe("b");
+        return (game, game.Players.First(p => p.Id == "b"));
+    }
 
     /// <summary>Plays a whole table of bots through the module, exactly as the room would.</summary>
     private static (MiaModule Module, List<Emit> Emits) PlayItOut(int players, int lives, int seed, Random rng)

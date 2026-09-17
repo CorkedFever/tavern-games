@@ -7,11 +7,11 @@ namespace TavernGames.Core.Games.Mia;
 /// which beats everything. This type is the only place that ordering lives, so the
 /// engine, the bot and the plugin all rank values the same way.
 ///
-/// The constructor takes the dice as they lie and does not validate them; build values
-/// with <see cref="FromDice"/> or <see cref="FromCode"/> and check <see cref="IsValid"/>
-/// for anything that came off the wire.
+/// The constructor takes the dice as they lie and does not reject them; build values with
+/// <see cref="FromDice"/> or <see cref="FromCode"/> and check <see cref="IsValid"/> for
+/// anything that came off the wire. Dice that no cup could hold are never valid.
 /// </summary>
-public readonly record struct MiaValue(int High, int Low) : IComparable<MiaValue>
+public readonly record struct MiaValue(int High, int Low)
 {
     /// <summary>Every legal value, lowest first. This array *is* the game's ranking.</summary>
     private static readonly int[] OrderedCodes =
@@ -37,8 +37,12 @@ public readonly record struct MiaValue(int High, int Low) : IComparable<MiaValue
     /// <summary>The two-digit form used on the wire and in the UI: 52, 33, 21.</summary>
     public int Code => High * 10 + Low;
 
-    /// <summary>Position in the ranking, 0 for 31 up to 20 for Mia; -1 for a value that is not legal.</summary>
-    public int Rank => Code is >= 11 and <= 66 ? RankByCode[Code] : -1;
+    /// <summary>
+    /// Position in the ranking, 0 for 31 up to 20 for Mia; -1 for a value that is not legal.
+    /// The dice themselves are checked, not just the two-digit code they add up to, so a
+    /// pair no cup could hold cannot borrow another value's rank.
+    /// </summary>
+    public int Rank => High is >= 1 and <= 6 && Low is >= 1 and <= 6 ? RankByCode[Code] : -1;
 
     public bool IsValid => Rank >= 0;
     public bool IsMia => High == 2 && Low == 1;
@@ -68,8 +72,6 @@ public readonly record struct MiaValue(int High, int Low) : IComparable<MiaValue
 
     /// <summary>Spoken form for logs and buttons: "52", "double 4s", "Mia".</summary>
     public string Describe() => IsMia ? "Mia" : IsDouble ? $"double {High}s" : Code.ToString();
-
-    public int CompareTo(MiaValue other) => Rank.CompareTo(other.Rank);
 
     public override string ToString() => Describe();
 

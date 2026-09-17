@@ -240,7 +240,13 @@ public sealed class MiaGame
         var honest = !announced.Beats(actual); // the roll reached the claim, so the claim stood up
         var cost = announced.IsMia ? 2 : 1;
         var loser = honest ? caller : announcer;
-        loser.Lives = Math.Max(0, loser.Lives - cost);
+
+        // A Mia costs two lives from a player who has two. Against the last one it takes
+        // that and no more, and the table is told what was taken, not what it would have
+        // cost a fuller purse.
+        var before = loser.Lives;
+        loser.Lives = Math.Max(0, before - cost);
+        var paid = before - loser.Lives;
 
         // Nobody is on the clock while the reveal is read, and the snapshot is taken after
         // the life is gone so the dice and the new count arrive together.
@@ -248,7 +254,7 @@ public sealed class MiaGame
         var events = new List<MiaEvent>
         {
             new(MiaEventKind.Called, Snapshot(), caller.Id, announcer.Id, announced.Code, actual.Code,
-                honest, loser.Id, cost, loser.IsOut),
+                honest, loser.Id, paid, loser.IsOut),
         };
 
         EndRound(loser, events);
