@@ -41,7 +41,7 @@ The server and plugin are split into a **platform** and **games**:
   start. A venue's leaderboard counts only games with two or more real players, so
   wins against bots can't be farmed. A player's own record counts everything.
 
-All of this lives in one SQLite file (`Tavern:DbPath`, default `data/tavern.db` next to
+All of this lives in one SQLite file (`Tavern:DbPath`, default `tavern-data/tavern.db` next to
 the server; set env `Tavern__DbPath` to move it). The schema is a list of numbered
 scripts in `TavernDb`, applied on startup, so a new build upgrades an existing file.
 Back that file up and you've backed up everything.

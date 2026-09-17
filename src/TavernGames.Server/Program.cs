@@ -12,7 +12,7 @@ builder.Services.AddSingleton(sp =>
 {
     var configured = sp.GetRequiredService<IConfiguration>()["Tavern:DbPath"];
     var path = string.IsNullOrWhiteSpace(configured)
-        ? Path.Combine(sp.GetRequiredService<IHostEnvironment>().ContentRootPath, "data", "tavern.db")
+        ? Path.Combine(sp.GetRequiredService<IHostEnvironment>().ContentRootPath, "tavern-data", "tavern.db")
         : configured;
     return new TavernDb(path);
 });
