@@ -12,6 +12,8 @@ services:
       - ASPNETCORE_URLS=http://0.0.0.0:5050
       # Optional knobs:
       # - TAVERN_MAX_ROOMS=200       # cap concurrent rooms (abuse protection)
+    volumes:
+      - tavern_data:/app/data       # profiles, venues and leaderboards (SQLite) survive rebuilds
     networks: [web]
     # No host ports published — only Caddy is exposed to the internet.
 
@@ -32,5 +34,6 @@ networks:
   web:
 
 volumes:
+  tavern_data:
   caddy_data:
   caddy_config:

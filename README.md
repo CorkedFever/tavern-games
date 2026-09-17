@@ -25,6 +25,27 @@ The server and plugin are split into a **platform** and **games**:
 - A game is a server-side `IGameModule` (rules, bot brain, its own wire messages) and a
   plugin-side `IClientGame` (state, log wording, narration, table view).
 
+## Profiles and venues
+
+- **Profiles.** The first time a plugin connects, the server issues it a secret token
+  and the plugin keeps it in its config. The same token brings the same profile back,
+  so there are no passwords; the server stores only the token's hash. A profile has a
+  display name, a tagline, and a lifetime record per game. Players can delete their
+  profile from the Profile tab. Guests (no profile) can still play private tables.
+- **Venues.** Anyone with a profile can start a venue and hand out its join code.
+  Roles are member, staff and owner. Staff host tables for the venue, rotate the join
+  code and remove members; the owner also manages roles, edits or deletes the venue,
+  and can hand it over. A venue's tables seat members only (anyone may spectate) and
+  are listed on the venue page, so members join without needing a room code.
+- **Leaderboards.** Every finished game is recorded for the profiles seated at the
+  start. A venue's leaderboard counts only games with two or more real players, so
+  wins against bots can't be farmed. A player's own record counts everything.
+
+All of this lives in one SQLite file (`Tavern:DbPath`, default `data/tavern.db` next to
+the server; set env `Tavern__DbPath` to move it). The schema is a list of numbered
+scripts in `TavernDb`, applied on startup, so a new build upgrades an existing file.
+Back that file up and you've backed up everything.
+
 ## Projects
 
 | Project | Target | Role |
@@ -77,9 +98,12 @@ running it in Docker behind Caddy.
 1. In `/xlsettings` → Experimental → Dev Plugin Locations, add
    `src/TavernGames.Plugin/bin/Release/TavernGames.dll`, then enable it in `/xlplugins`.
 2. In game, run `/tavern`.
-3. Set the server URL (default `ws://localhost:5050/ws`) and connect. Pick a game and
-   **Create Room**, or **Join** / **Spectate** with a 4-character code. The host can add
-   bots and starts the game.
+3. Set the server URL (default `ws://localhost:5050/ws`) and connect. On the **Play**
+   tab pick a game and **Create Room**, or **Join** / **Spectate** with a 4-character
+   code. The host can add bots and starts the game.
+4. The **Venues** tab is where you join a venue by code or start your own, see its open
+   tables, leaderboard and members. Staff get a "Host for" picker on the Play tab.
+5. The **Profile** tab holds your name, tagline and record.
 
 ## The games
 

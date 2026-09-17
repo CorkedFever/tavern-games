@@ -13,6 +13,12 @@ public sealed class Configuration : IPluginConfiguration
     /// <summary>Display name shown to other players. Defaults to the local character name when empty.</summary>
     public string PlayerName { get; set; } = "";
 
+    /// <summary>
+    /// The secret each server issued to identify this install's profile, keyed by server URL.
+    /// Anyone holding a token can act as that profile, so it never leaves this config file.
+    /// </summary>
+    public Dictionary<string, string> ProfileTokens { get; set; } = new();
+
     /// <summary>The game picked last time a room was created.</summary>
     public string LastGameType { get; set; } = "liarsdice";
 

@@ -18,6 +18,9 @@ public sealed class GameSession(IReadOnlyList<IClientGame> games)
     public string RoomCode { get; private set; } = "";
     public string HostId { get; private set; } = "";
     public string GameType { get; private set; } = "";
+
+    /// <summary>The venue hosting this table, if any.</summary>
+    public string? VenueName { get; private set; }
     public GamePhase Phase { get; private set; } = GamePhase.Lobby;
     public bool IsSpectator { get; private set; }
     public string? WinnerId { get; private set; }
@@ -41,6 +44,7 @@ public sealed class GameSession(IReadOnlyList<IClientGame> games)
     public void Reset()
     {
         MyId = RoomCode = HostId = GameType = "";
+        VenueName = null;
         Phase = GamePhase.Lobby;
         IsSpectator = false;
         WinnerId = null;
@@ -83,6 +87,7 @@ public sealed class GameSession(IReadOnlyList<IClientGame> games)
                 RoomCode = update.RoomCode;
                 HostId = update.HostId;
                 GameType = update.GameType;
+                VenueName = update.VenueName;
                 Phase = update.Phase;
                 SetPlayers(update.Players);
                 break;

@@ -22,10 +22,21 @@ public sealed class MainWindow : Window
     private string _gameType;
     private float _turnDelaySec;
     private string _joinCode = "";
+    private string? _hostVenueId;   // host the next table for this venue (null = private table)
+    private bool _jumpToPlayTab;
+
+    private readonly ProfileTab _profileTab;
+    private readonly VenuesTab _venuesTab;
 
     public MainWindow(Plugin plugin) : base("Tavern Games##TavernGamesMain")
     {
         _plugin = plugin;
+        _profileTab = new ProfileTab(plugin);
+        _venuesTab = new VenuesTab(plugin, venueId =>
+        {
+            _hostVenueId = venueId;
+            _jumpToPlayTab = true;
+        });
         _serverUrl = plugin.Config.ServerUrl;
         _playerName = plugin.Config.PlayerName;
         _gameType = GameCatalog.Find(plugin.Config.LastGameType)?.Type ?? GameCatalog.Games[0].Type;
@@ -131,11 +142,35 @@ public sealed class MainWindow : Window
 
     private void DrawLobbyEntry()
     {
-        ImGui.Text("Connected.");
+        var profile = _plugin.Account.Profile;
+        ImGui.TextUnformatted(profile is null ? "Connected as a guest." : $"Connected as {profile.DisplayName}.");
         ImGui.SameLine();
         if (ImGui.SmallButton("Disconnect")) _ = Client.DisconnectAsync();
-        ImGui.Separator();
 
+        if (!ImGui.BeginTabBar("##lobbytabs")) return;
+
+        var playFlags = _jumpToPlayTab ? ImGuiTabItemFlags.SetSelected : ImGuiTabItemFlags.None;
+        _jumpToPlayTab = false;
+        if (ImGui.BeginTabItem("Play", playFlags))
+        {
+            DrawPlayTab();
+            ImGui.EndTabItem();
+        }
+        if (ImGui.BeginTabItem("Venues"))
+        {
+            _venuesTab.Draw();
+            ImGui.EndTabItem();
+        }
+        if (ImGui.BeginTabItem("Profile"))
+        {
+            _profileTab.Draw();
+            ImGui.EndTabItem();
+        }
+        ImGui.EndTabBar();
+    }
+
+    private void DrawPlayTab()
+    {
         ImGui.TextUnformatted("Open a new table");
         var game = GameCatalog.Find(_gameType) ?? GameCatalog.Games[0];
 
@@ -162,6 +197,7 @@ public sealed class MainWindow : Window
 
         ImGui.SliderFloat("Game speed (sec/move)", ref _turnDelaySec, 0.5f, 3.0f, "%.1f s");
         ImGui.TextDisabled("Higher = slower bots and longer pauses between rounds.");
+        DrawHostVenuePicker();
 
         if (ImGui.Button("Create Room"))
         {
@@ -172,7 +208,7 @@ public sealed class MainWindow : Window
             _plugin.Config.LastGameType = game.Type;
             _plugin.Config.TurnDelayMs = (int)(_turnDelaySec * 1000);
             _plugin.Config.Save();
-            Client.Send(new CreateRoom(_plugin.ResolvePlayerName(), game.Type, options, _plugin.Config.TurnDelayMs));
+            Client.Send(new CreateRoom(_plugin.ResolvePlayerName(), game.Type, options, _plugin.Config.TurnDelayMs, _hostVenueId));
         }
 
         ImGui.Separator();
@@ -185,6 +221,28 @@ public sealed class MainWindow : Window
         if (ImGui.Button("Spectate") && _joinCode.Trim().Length > 0)
             Client.Send(new Spectate(_joinCode.Trim()));
         ImGui.TextDisabled("Join to play, or Spectate to just watch the table.");
+    }
+
+    /// <summary>Staff and owners can open the table on behalf of one of their venues.</summary>
+    private void DrawHostVenuePicker()
+    {
+        var hostable = _plugin.Account.HostableVenues.ToList();
+        if (_hostVenueId is not null && hostable.All(v => v.Id != _hostVenueId))
+            _hostVenueId = null; // no longer staff there
+        if (hostable.Count == 0) return;
+
+        var current = hostable.FirstOrDefault(v => v.Id == _hostVenueId)?.Name ?? "Nobody (private table)";
+        if (ImGui.BeginCombo("Host for", current))
+        {
+            if (ImGui.Selectable("Nobody (private table)", _hostVenueId is null))
+                _hostVenueId = null;
+            foreach (var venue in hostable)
+                if (ImGui.Selectable($"{venue.Name}##{venue.Id}", venue.Id == _hostVenueId))
+                    _hostVenueId = venue.Id;
+            ImGui.EndCombo();
+        }
+        if (_hostVenueId is not null)
+            ImGui.TextDisabled("Members can join from the venue page, and the result counts on its leaderboard.");
     }
 
     /// <summary>Which game, which room, and whether you're only watching.</summary>
@@ -201,6 +259,8 @@ public sealed class MainWindow : Window
             ImGui.SameLine();
             ImGui.TextColored(TableUi.Cyan, "(spectating)");
         }
+        if (Session.VenueName is { } venueName)
+            ImGui.TextDisabled($"Hosted by {venueName}");
         ImGui.Separator();
     }
 

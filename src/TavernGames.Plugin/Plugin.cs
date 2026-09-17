@@ -2,6 +2,7 @@ using Dalamud.Game.Command;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
+using TavernGames.Core.Protocol;
 using TavernGames.Plugin.Game;
 using TavernGames.Plugin.Games;
 using TavernGames.Plugin.Windows;
@@ -22,6 +23,9 @@ public sealed class Plugin : IDalamudPlugin
     internal Configuration Config { get; }
     internal GameClient Client { get; }
     internal GameSession Session { get; } = new([new LiarsDiceClient(), new PigClient()]);
+    internal AccountState Account { get; } = new();
+
+    private ConnectionState _lastConnectionState = ConnectionState.Disconnected;
 
     private readonly WindowSystem _windows = new("TavernGames");
     private readonly MainWindow _mainWindow;
@@ -79,8 +83,16 @@ public sealed class Plugin : IDalamudPlugin
     {
         try
         {
+            TrackConnection();
+
             while (Client.Inbound.TryDequeue(out var message))
             {
+                if (Account.Apply(message))
+                {
+                    PersistAccountChanges();
+                    continue;
+                }
+
                 Session.Apply(message);
 
                 // Narrate the event to the local chat log (roleplay flavor, local-only).
@@ -94,6 +106,54 @@ public sealed class Plugin : IDalamudPlugin
         catch (Exception ex)
         {
             Log.Error(ex, "Tavern Games: error applying a server message.");
+        }
+    }
+
+    /// <summary>Says hello when a connection comes up, and forgets server state when it goes down.</summary>
+    private void TrackConnection()
+    {
+        var state = Client.State;
+        if (state == _lastConnectionState) return;
+
+        if (state == ConnectionState.Connected)
+        {
+            SayHello();
+        }
+        else if (_lastConnectionState == ConnectionState.Connected)
+        {
+            // Whatever the old connection still had queued is about a table we've lost.
+            while (Client.Inbound.TryDequeue(out _)) { }
+            Session.Reset();
+            Account.Reset();
+        }
+
+        _lastConnectionState = state;
+    }
+
+    /// <summary>Identifies this install to the server. The saved token (one per server) brings the same profile back.</summary>
+    internal void SayHello()
+    {
+        Config.ProfileTokens.TryGetValue(Config.ServerUrl, out var token);
+        Client.Send(new Hello(token, ResolvePlayerName()));
+    }
+
+    private void PersistAccountChanges()
+    {
+        if (Account.IssuedToken is { } token)
+        {
+            Account.IssuedToken = null;
+            if (!Config.ProfileTokens.TryGetValue(Config.ServerUrl, out var saved) || saved != token)
+            {
+                Config.ProfileTokens[Config.ServerUrl] = token;
+                Config.Save();
+            }
+        }
+
+        if (Account.ProfileWasDeleted)
+        {
+            Account.ProfileWasDeleted = false;
+            Config.ProfileTokens.Remove(Config.ServerUrl);
+            Config.Save();
         }
     }
 
