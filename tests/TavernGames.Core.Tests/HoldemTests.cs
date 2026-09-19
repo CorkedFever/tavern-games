@@ -664,7 +664,8 @@ public class HoldemTests
     public void Bots_NeverFoldWhenCheckingIsFree_AndNeverRaiseWhenTheyMayNot()
     {
         var rng = new Random(3);
-        var module = new HoldemModule(Deck.Shuffled, 1000, 10, 0);
+        var deckRng = new Random(3); // seeded deal so this statistical check is deterministic
+        var module = new HoldemModule(() => Deck.Shuffled(deckRng), 1000, 10, 0);
         for (var i = 0; i < 4; i++) module.AddPlayer($"bot{i}", $"Bot {i}", isBot: true);
 
         // The public table says what the seat on the clock is allowed to do, so the decision

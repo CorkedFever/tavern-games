@@ -100,6 +100,15 @@ Environment knobs: `TAVERN_MAX_ROOMS` (default 200) caps concurrent rooms;
 `TAVERN_BOT_DELAY_MS` overrides bot pacing (tests set it to 0). See `deploy/` for
 running it in Docker behind Caddy.
 
+## Play offline (no server)
+
+The relay is only needed to play *with other people*. Everything else runs in the plugin
+itself: the game engines are a plain library with no server dependency, so the plugin
+hosts one in-process (`SoloTable`) and delivers the same messages the server would. Open
+`/tavern`, pick a game and a number of bots under "Play against bots", and click "Play vs
+bots" -- you are dealt in immediately, no connection required. Profiles, venues and
+leaderboards are server-only and simply don't appear in solo play.
+
 ## Use the plugin
 
 1. In `/xlsettings` → Experimental → Dev Plugin Locations, add

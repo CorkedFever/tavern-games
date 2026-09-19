@@ -32,6 +32,18 @@ public sealed class Deck
         return new Deck(cards);
     }
 
+    /// <summary>A seeded shuffle, for tests that need a repeatable deal. Never use it in real play.</summary>
+    public static Deck Shuffled(Random rng)
+    {
+        var cards = AllCards().ToList();
+        for (var i = cards.Count - 1; i > 0; i--)
+        {
+            var j = rng.Next(i + 1);
+            (cards[i], cards[j]) = (cards[j], cards[i]);
+        }
+        return new Deck(cards);
+    }
+
     /// <summary>
     /// A deck that deals exactly <paramref name="topCards"/> first, in order, followed by
     /// the remaining cards in a fixed order. For tests.

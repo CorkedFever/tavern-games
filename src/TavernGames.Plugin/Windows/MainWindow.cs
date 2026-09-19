@@ -24,6 +24,7 @@ public sealed class MainWindow : Window
     private string _joinCode = "";
     private string? _hostVenueId;   // host the next table for this venue (null = private table)
     private bool _jumpToPlayTab;
+    private int _offlineBots = 3;
 
     private readonly ProfileTab _profileTab;
     private readonly VenuesTab _venuesTab;
@@ -127,7 +128,36 @@ public sealed class MainWindow : Window
 
     private void DrawConnect()
     {
-        ImGui.TextWrapped("Connect to a Tavern Games server to open or join a table.");
+        // Solo-vs-bots comes first: it needs no server and is the fastest way to just play.
+        ImGui.TextColored(TableUi.Gold, "Play against bots");
+        ImGui.TextDisabled("Right here, no server needed.");
+        ImGui.Spacing();
+
+        var game = DrawGameChooser();
+        DrawGameOptions(game);
+
+        var minBots = game.MinPlayers - 1;          // Blackjack allows 0 (just you and the dealer)
+        var maxBots = game.MaxPlayers - 1;
+        _offlineBots = Math.Clamp(_offlineBots, minBots, maxBots);
+        if (minBots < maxBots)
+            ImGui.SliderInt("Bots", ref _offlineBots, minBots, maxBots);
+        else
+            ImGui.TextDisabled(minBots == 0 ? "Just you against the dealer." : $"{minBots} bot(s).");
+
+        if (ImGui.Button("Play vs bots"))
+        {
+            SaveSetup(game);
+            Session.Reset();
+            Client.StartLocal(game.Type, OptionsFor(game), _plugin.Config.TurnDelayMs, _plugin.ResolvePlayerName(), _offlineBots);
+        }
+
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
+
+        // The server path is for playing with other people (and for venues and leaderboards).
+        ImGui.TextColored(TableUi.Gold, "Play with others");
+        ImGui.TextDisabled("Connect to a Tavern Games server to open or join a table with other players.");
         ImGui.Spacing();
 
         ImGui.InputText("Server", ref _serverUrl, 256);
@@ -153,6 +183,48 @@ public sealed class MainWindow : Window
             ImGui.Spacing();
             ImGui.TextColored(TableUi.Red, $"Error: {Client.LastError}");
         }
+    }
+
+    /// <summary>Game picker plus its blurb; returns the chosen game and remembers the choice.</summary>
+    private GameDescriptor DrawGameChooser()
+    {
+        var game = GameCatalog.Find(_gameType) ?? GameCatalog.Games[0];
+        if (ImGui.BeginCombo("Game", game.DisplayName))
+        {
+            foreach (var candidate in GameCatalog.Games)
+                if (ImGui.Selectable(candidate.DisplayName, candidate.Type == game.Type))
+                    _gameType = candidate.Type;
+            ImGui.EndCombo();
+        }
+        ImGui.TextDisabled($"{game.Blurb} ({game.MinPlayers}-{game.MaxPlayers} players)");
+        return game;
+    }
+
+    /// <summary>Each game's room options as sliders, plus the shared game-speed slider.</summary>
+    private void DrawGameOptions(GameDescriptor game)
+    {
+        foreach (var option in game.Options)
+        {
+            var key = $"{game.Type}.{option.Key}";
+            var value = _plugin.Config.GameOptions.TryGetValue(key, out var saved) ? saved : option.Default;
+            value = Math.Clamp(value, option.Min, option.Max);
+            if (ImGui.SliderInt($"{option.Label}##{key}", ref value, option.Min, option.Max))
+                _plugin.Config.GameOptions[key] = value;
+        }
+
+        ImGui.SliderFloat("Game speed (sec/move)", ref _turnDelaySec, 0.5f, 3.0f, "%.1f s");
+    }
+
+    private Dictionary<string, int> OptionsFor(GameDescriptor game) =>
+        game.Options.ToDictionary(
+            o => o.Key,
+            o => _plugin.Config.GameOptions.TryGetValue($"{game.Type}.{o.Key}", out var v) ? v : o.Default);
+
+    private void SaveSetup(GameDescriptor game)
+    {
+        _plugin.Config.LastGameType = game.Type;
+        _plugin.Config.TurnDelayMs = (int)(_turnDelaySec * 1000);
+        _plugin.Config.Save();
     }
 
     private void DrawLobbyEntry()
@@ -187,43 +259,15 @@ public sealed class MainWindow : Window
     private void DrawPlayTab()
     {
         ImGui.TextUnformatted("Open a new table");
-        var game = GameCatalog.Find(_gameType) ?? GameCatalog.Games[0];
-
-        if (ImGui.BeginCombo("Game", game.DisplayName))
-        {
-            foreach (var candidate in GameCatalog.Games)
-            {
-                if (ImGui.Selectable(candidate.DisplayName, candidate.Type == game.Type))
-                    _gameType = candidate.Type;
-            }
-            ImGui.EndCombo();
-        }
-        ImGui.TextDisabled($"{game.Blurb} ({game.MinPlayers}-{game.MaxPlayers} players)");
-
-        // Each game declares its own room options; they all render as sliders.
-        foreach (var option in game.Options)
-        {
-            var key = $"{game.Type}.{option.Key}";
-            var value = _plugin.Config.GameOptions.TryGetValue(key, out var saved) ? saved : option.Default;
-            value = Math.Clamp(value, option.Min, option.Max);
-            if (ImGui.SliderInt($"{option.Label}##{key}", ref value, option.Min, option.Max))
-                _plugin.Config.GameOptions[key] = value;
-        }
-
-        ImGui.SliderFloat("Game speed (sec/move)", ref _turnDelaySec, 0.5f, 3.0f, "%.1f s");
-        ImGui.TextDisabled("Higher = slower bots and longer pauses between rounds.");
+        var game = DrawGameChooser();
+        DrawGameOptions(game);
+        ImGui.TextDisabled("Higher speed = slower bots and longer pauses between rounds.");
         DrawHostVenuePicker();
 
         if (ImGui.Button("Create Room"))
         {
-            var options = game.Options.ToDictionary(
-                o => o.Key,
-                o => _plugin.Config.GameOptions.TryGetValue($"{game.Type}.{o.Key}", out var v) ? v : o.Default);
-
-            _plugin.Config.LastGameType = game.Type;
-            _plugin.Config.TurnDelayMs = (int)(_turnDelaySec * 1000);
-            _plugin.Config.Save();
-            Client.Send(new CreateRoom(_plugin.ResolvePlayerName(), game.Type, options, _plugin.Config.TurnDelayMs, _hostVenueId));
+            SaveSetup(game);
+            Client.Send(new CreateRoom(_plugin.ResolvePlayerName(), game.Type, OptionsFor(game), _plugin.Config.TurnDelayMs, _hostVenueId));
         }
 
         ImGui.Separator();

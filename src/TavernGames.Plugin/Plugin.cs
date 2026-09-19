@@ -121,7 +121,8 @@ public sealed class Plugin : IDalamudPlugin
 
         if (state == ConnectionState.Connected)
         {
-            SayHello();
+            // Solo play has no server to greet; the local table already seated us.
+            if (!Client.IsLocal) SayHello();
         }
         else if (_lastConnectionState == ConnectionState.Connected)
         {

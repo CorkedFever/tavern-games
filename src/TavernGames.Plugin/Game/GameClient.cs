@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
 using Dalamud.Plugin.Services;
+using TavernGames.Core.Platform;
 using TavernGames.Core.Protocol;
 
 namespace TavernGames.Plugin.Game;
@@ -19,11 +20,32 @@ public sealed class GameClient(IPluginLog log) : IDisposable
     private ClientWebSocket? _socket;
     private CancellationTokenSource? _cts;
     private Task? _receiveLoop;
+    private SoloTable? _local;
 
     public ConnectionState State { get; private set; } = ConnectionState.Disconnected;
     public string? LastError { get; private set; }
 
     public ConcurrentQueue<NetMessage> Inbound => _inbound;
+
+    /// <summary>True while playing solo in-process, with no server. There is no profile or venue.</summary>
+    public bool IsLocal => _local is not null;
+
+    /// <summary>
+    /// Starts a solo game against bots with no server: the game runs in-process and the
+    /// player drops straight into the table. This is the "just let me play" path.
+    /// </summary>
+    public void StartLocal(string gameType, IReadOnlyDictionary<string, int>? options, int turnDelayMs, string playerName, int bots)
+    {
+        TeardownSocket();
+        TeardownLocal();
+        while (_inbound.TryDequeue(out _)) { } // drop anything left from a previous session
+
+        LastError = null;
+        _local = new SoloTable(gameType, options, turnDelayMs, playerName, _inbound.Enqueue,
+            onFault: ex => log.Warning(ex, "Local bot fault"));
+        State = ConnectionState.Connected;
+        _ = _local.QuickStartAsync(bots);
+    }
 
     public async Task ConnectAsync(string url)
     {
@@ -69,6 +91,19 @@ public sealed class GameClient(IPluginLog log) : IDisposable
 
     public void Send(NetMessage message)
     {
+        if (_local is { } local)
+        {
+            // Leaving a solo table ends the session and returns to the entry screen.
+            if (message is LeaveRoom)
+            {
+                TeardownLocal();
+                State = ConnectionState.Disconnected;
+                return;
+            }
+            local.Submit(message);
+            return;
+        }
+
         if (State != ConnectionState.Connected || _socket is null) return;
         var bytes = Encoding.UTF8.GetBytes(message.Serialize());
         // Fire-and-forget: ClientWebSocket allows one outstanding send; our cadence is low.
@@ -134,9 +169,26 @@ public sealed class GameClient(IPluginLog log) : IDisposable
         }
     }
 
+    private void TeardownLocal()
+    {
+        _local?.Dispose();
+        _local = null;
+    }
+
+    private void TeardownSocket()
+    {
+        try { _cts?.Cancel(); } catch { /* ignore */ }
+        try { _socket?.Abort(); } catch { /* ignore */ }
+        try { _socket?.Dispose(); } catch { /* ignore */ }
+        try { _cts?.Dispose(); } catch { /* ignore */ }
+        _socket = null;
+        _cts = null;
+    }
+
     /// <summary>Graceful close used by the UI (Disconnect/Leave). Safe to call repeatedly.</summary>
     public async Task DisconnectAsync()
     {
+        TeardownLocal();
         try { _cts?.Cancel(); } catch { /* ignore */ }
 
         var socket = _socket;
@@ -163,12 +215,8 @@ public sealed class GameClient(IPluginLog log) : IDisposable
     /// </summary>
     public void Dispose()
     {
-        try { _cts?.Cancel(); } catch { /* ignore */ }
-        try { _socket?.Abort(); } catch { /* ignore */ }
-        try { _socket?.Dispose(); } catch { /* ignore */ }
-        try { _cts?.Dispose(); } catch { /* ignore */ }
-        _socket = null;
-        _cts = null;
+        TeardownLocal();
+        TeardownSocket();
         State = ConnectionState.Disconnected;
     }
 }
