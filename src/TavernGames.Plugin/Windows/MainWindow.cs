@@ -18,7 +18,6 @@ public sealed class MainWindow : Window
 
     // Form fields persisted across frames.
     private string _serverUrl;
-    private string _playerName;
     private string _gameType;
     private float _turnDelaySec;
     private string _joinCode = "";
@@ -39,7 +38,6 @@ public sealed class MainWindow : Window
             _jumpToPlayTab = true;
         });
         _serverUrl = plugin.Config.ServerUrl;
-        _playerName = plugin.Config.PlayerName;
         _gameType = GameCatalog.Find(plugin.Config.LastGameType)?.Type ?? GameCatalog.Games[0].Type;
         _turnDelaySec = plugin.Config.TurnDelayMs / 1000f;
 
@@ -85,17 +83,7 @@ public sealed class MainWindow : Window
 
     private void DrawContent()
     {
-        if (Client.State != Game.ConnectionState.Connected)
-        {
-            DrawConnect();
-            return;
-        }
-
-        if (!Session.InRoom)
-        {
-            DrawLobbyEntry();
-        }
-        else
+        if (Session.InRoom)
         {
             DrawRoomHeader();
 
@@ -121,9 +109,50 @@ public sealed class MainWindow : Window
                 if (ImGui.Button(Session.IsSpectator ? "Stop watching" : "Leave")) LeaveRoom();
             }
         }
+        else
+        {
+            DrawEntry();
+        }
 
         ImGui.Separator();
         DrawLog();
+    }
+
+    /// <summary>
+    /// The screen shown when you're not at a table: Play, Profile, and (when connected)
+    /// Venues. Profile is always here, so it works with no server.
+    /// </summary>
+    private void DrawEntry()
+    {
+        var online = Client.State == Game.ConnectionState.Connected && !Client.IsLocal;
+        if (online)
+        {
+            var profile = _plugin.Account.Profile;
+            ImGui.TextUnformatted(profile is null ? "Connected as a guest." : $"Connected as {profile.DisplayName}.");
+            ImGui.SameLine();
+            if (ImGui.SmallButton("Disconnect")) _ = Client.DisconnectAsync();
+        }
+
+        if (!ImGui.BeginTabBar("##entrytabs")) return;
+
+        var playFlags = _jumpToPlayTab ? ImGuiTabItemFlags.SetSelected : ImGuiTabItemFlags.None;
+        _jumpToPlayTab = false;
+        if (ImGui.BeginTabItem("Play", playFlags))
+        {
+            Guarded("play tab", online ? DrawPlayTab : DrawConnect);
+            ImGui.EndTabItem();
+        }
+        if (online && ImGui.BeginTabItem("Venues"))
+        {
+            Guarded("venues tab", _venuesTab.Draw);
+            ImGui.EndTabItem();
+        }
+        if (ImGui.BeginTabItem("Profile"))
+        {
+            Guarded("profile tab", _profileTab.Draw);
+            ImGui.EndTabItem();
+        }
+        ImGui.EndTabBar();
     }
 
     private void DrawConnect()
@@ -161,8 +190,7 @@ public sealed class MainWindow : Window
         ImGui.Spacing();
 
         ImGui.InputText("Server", ref _serverUrl, 256);
-        ImGui.InputText("Name", ref _playerName, 24);
-        ImGui.TextDisabled("Leave Name blank to use your character name.");
+        ImGui.TextDisabled("Your name and tagline are set on the Profile tab.");
         DrawNarrationToggle();
         ImGui.Spacing();
 
@@ -173,7 +201,6 @@ public sealed class MainWindow : Window
         else if (ImGui.Button("Connect"))
         {
             _plugin.Config.ServerUrl = _serverUrl;
-            _plugin.Config.PlayerName = _playerName;
             _plugin.Config.Save();
             _ = Client.ConnectAsync(_serverUrl);
         }
@@ -225,35 +252,6 @@ public sealed class MainWindow : Window
         _plugin.Config.LastGameType = game.Type;
         _plugin.Config.TurnDelayMs = (int)(_turnDelaySec * 1000);
         _plugin.Config.Save();
-    }
-
-    private void DrawLobbyEntry()
-    {
-        var profile = _plugin.Account.Profile;
-        ImGui.TextUnformatted(profile is null ? "Connected as a guest." : $"Connected as {profile.DisplayName}.");
-        ImGui.SameLine();
-        if (ImGui.SmallButton("Disconnect")) _ = Client.DisconnectAsync();
-
-        if (!ImGui.BeginTabBar("##lobbytabs")) return;
-
-        var playFlags = _jumpToPlayTab ? ImGuiTabItemFlags.SetSelected : ImGuiTabItemFlags.None;
-        _jumpToPlayTab = false;
-        if (ImGui.BeginTabItem("Play", playFlags))
-        {
-            Guarded("play tab", DrawPlayTab);
-            ImGui.EndTabItem();
-        }
-        if (ImGui.BeginTabItem("Venues"))
-        {
-            Guarded("venues tab", _venuesTab.Draw);
-            ImGui.EndTabItem();
-        }
-        if (ImGui.BeginTabItem("Profile"))
-        {
-            Guarded("profile tab", _profileTab.Draw);
-            ImGui.EndTabItem();
-        }
-        ImGui.EndTabBar();
     }
 
     private void DrawPlayTab()

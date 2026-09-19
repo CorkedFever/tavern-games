@@ -99,6 +99,13 @@ public sealed class Plugin : IDalamudPlugin
 
                 Session.Apply(message);
 
+                // Keep your own device record, so a profile and stats exist even offline.
+                if (message is GameEnded ended && !Session.IsSpectator && Session.MyId.Length > 0 && Session.GameType.Length > 0)
+                {
+                    Config.RecordLocalResult(Session.GameType, won: ended.WinnerId == Session.MyId);
+                    Config.Save();
+                }
+
                 // Narrate the event to the local chat log (roleplay flavor, local-only).
                 if (Config.NarrateToChat && ChatNarrator.BuildLine(message, Session) is { } line)
                 {

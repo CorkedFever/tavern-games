@@ -4,103 +4,97 @@ using TavernGames.Core.Protocol;
 
 namespace TavernGames.Plugin.Windows;
 
-/// <summary>Your player profile: the name and tagline others see, your record, and the way out.</summary>
+/// <summary>
+/// Your player profile: the name and tagline you show at tables, and your record. It is
+/// local-first, so it works with no server. Your name and tagline live in the plugin
+/// config and are used at every table; when you're connected to a server, saving also
+/// pushes them up so leaderboards show the same name. Your record is kept per game on
+/// this device and counts offline games too.
+/// </summary>
 internal sealed class ProfileTab(Plugin plugin)
 {
     private string _name = "";
     private string _tagline = "";
-    private string _loadedFor = "";
-    private bool _confirmDelete;
-    private bool _statsRequested;
+    private bool _loaded;
 
     public void Draw()
     {
-        var account = plugin.Account;
-        if (account.Profile is not { } profile)
+        var config = plugin.Config;
+        if (!_loaded)
         {
-            ImGui.TextWrapped("You're playing as a guest on this server. A profile keeps your record and lets you join venues.");
-            if (ImGui.Button("Create my profile"))
-                plugin.SayHello();
-            _statsRequested = false;
+            _name = config.PlayerName;
+            _tagline = config.Tagline;
+            _loaded = true;
+        }
+
+        ImGui.TextColored(TableUi.Gold, "Player profile");
+        ImGui.Spacing();
+
+        ImGui.InputText("Display name", ref _name, 24);
+        ImGui.TextDisabled("Leave blank to use your character name.");
+        ImGui.InputText("Tagline", ref _tagline, 60);
+        ImGui.TextDisabled("Shown under your name. e.g. \"the masked gambler\"");
+
+        var online = plugin.Client.State == Game.ConnectionState.Connected && !plugin.Client.IsLocal;
+        var changed = _name.Trim() != config.PlayerName || _tagline.Trim() != config.Tagline;
+
+        ImGui.BeginDisabled(!changed);
+        if (ImGui.Button("Save"))
+        {
+            config.PlayerName = _name.Trim();
+            config.Tagline = _tagline.Trim();
+            config.Save();
+            _loaded = false; // re-read the trimmed values back into the fields
+            if (online && plugin.Account.HasProfile)
+                plugin.Client.Send(new UpdateProfile(config.PlayerName, config.Tagline));
+        }
+        ImGui.EndDisabled();
+
+        if (online)
+            ImGui.TextDisabled("Connected: saving also updates your name on this server.");
+
+        ImGui.Separator();
+        DrawRecord();
+    }
+
+    private void DrawRecord()
+    {
+        var config = plugin.Config;
+        ImGui.TextUnformatted("Your record");
+        ImGui.SameLine();
+        ImGui.TextDisabled("(this device, offline games included)");
+
+        var rows = GameCatalog.Games
+            .Select(g => (Game: g, Played: config.LocalPlayed.GetValueOrDefault(g.Type), Won: config.LocalWon.GetValueOrDefault(g.Type)))
+            .Where(r => r.Played > 0)
+            .ToList();
+
+        if (rows.Count == 0)
+        {
+            ImGui.TextDisabled("No finished games yet. Play one against the bots!");
             return;
         }
 
-        // Load the form once per profile (and again after the server confirms a save).
-        var stamp = $"{profile.Id}|{profile.DisplayName}|{profile.Tagline}";
-        if (_loadedFor != stamp)
-        {
-            _name = profile.DisplayName;
-            _tagline = profile.Tagline;
-            _loadedFor = stamp;
-        }
-
-        if (!_statsRequested)
-        {
-            plugin.Client.Send(new GetStats());
-            _statsRequested = true;
-        }
-
-        ImGui.InputText("Display name", ref _name, 24);
-        ImGui.InputText("Tagline", ref _tagline, 60);
-        ImGui.TextDisabled("Shown at tables, in venues and on leaderboards. e.g. \"the masked gambler\"");
-
-        var changed = _name.Trim() != profile.DisplayName || _tagline.Trim() != profile.Tagline;
-        ImGui.BeginDisabled(!changed || _name.Trim().Length == 0);
-        if (ImGui.Button("Save profile"))
-            plugin.Client.Send(new UpdateProfile(_name, _tagline));
-        ImGui.EndDisabled();
-
-        ImGui.Separator();
-        ImGui.TextUnformatted("Your record");
-        ImGui.SameLine();
-        if (ImGui.SmallButton("Refresh##stats"))
-            plugin.Client.Send(new GetStats());
-
-        if (account.Stats.Length == 0)
-        {
-            ImGui.TextDisabled("No finished games yet.");
-        }
-        else if (ImGui.BeginTable("##stats", 4, ImGuiTableFlags.RowBg | ImGuiTableFlags.BordersInnerH))
+        if (ImGui.BeginTable("##localrecord", 4, ImGuiTableFlags.RowBg | ImGuiTableFlags.BordersInnerH))
         {
             ImGui.TableSetupColumn("Game");
             ImGui.TableSetupColumn("Played");
             ImGui.TableSetupColumn("Won");
             ImGui.TableSetupColumn("Win rate");
             ImGui.TableHeadersRow();
-            foreach (var stat in account.Stats)
+            foreach (var (game, played, won) in rows)
             {
                 ImGui.TableNextRow();
                 ImGui.TableNextColumn();
-                ImGui.TextUnformatted(GameCatalog.Find(stat.GameType)?.DisplayName ?? stat.GameType);
+                ImGui.TextUnformatted(game.DisplayName);
                 ImGui.TableNextColumn();
-                ImGui.TextUnformatted(stat.Played.ToString());
+                ImGui.TextUnformatted(played.ToString());
                 ImGui.TableNextColumn();
-                ImGui.TextUnformatted(stat.Won.ToString());
+                ImGui.TextUnformatted(won.ToString());
                 ImGui.TableNextColumn();
-                ImGui.TextUnformatted(stat.Played == 0 ? "-" : $"{100.0 * stat.Won / stat.Played:0}%");
+                ImGui.TextUnformatted($"{100.0 * won / played:0}%");
             }
             ImGui.EndTable();
-        }
-        ImGui.TextDisabled("Your record counts every game. Venue leaderboards only count games with 2+ real players.");
-
-        ImGui.Separator();
-        ImGui.TextDisabled($"Profile id {profile.Id}. Your profile is tied to this plugin install on this server.");
-        if (!_confirmDelete)
-        {
-            if (ImGui.SmallButton("Delete my profile..."))
-                _confirmDelete = true;
-        }
-        else
-        {
-            ImGui.TextColored(TableUi.Red, "This erases your record and venue memberships for good.");
-            if (ImGui.SmallButton("Yes, delete it"))
-            {
-                plugin.Client.Send(new DeleteProfile());
-                _confirmDelete = false;
-            }
-            ImGui.SameLine();
-            if (ImGui.SmallButton("Keep it"))
-                _confirmDelete = false;
         }
     }
 }
