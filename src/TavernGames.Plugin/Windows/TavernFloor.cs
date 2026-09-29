@@ -8,6 +8,7 @@ using TavernGames.Core.Games.LiarsDice;
 using TavernGames.Core.Games.Mia;
 using TavernGames.Core.Games.Pig;
 using TavernGames.Core.Games.Roulette;
+using TavernGames.Core.Games.ShipCaptainCrew;
 using TavernGames.Core.Platform;
 using TavernGames.Plugin.Game;
 
@@ -259,6 +260,13 @@ internal sealed class TavernFloor
                     dl.AddLine(c + d * 3.5f * s, c + d * 9.5f * s, col, t * 0.8f);
                 }
                 dl.AddCircleFilled(c + new Vector2(0f, -6.8f * s), 1.6f * s, col, 10);
+                break;
+
+            case ShipCaptainCrewModule.Type:
+                // A hull, a mast and a sail.
+                dl.AddQuad(p0 + new Vector2(3f * s, 15f * s), p0 + new Vector2(21f * s, 15f * s), p0 + new Vector2(18f * s, 20f * s), p0 + new Vector2(6f * s, 20f * s), col, t);
+                dl.AddLine(p0 + new Vector2(12f * s, 3.5f * s), p0 + new Vector2(12f * s, 15f * s), col, t);
+                dl.AddTriangle(p0 + new Vector2(12.6f * s, 4.5f * s), p0 + new Vector2(19f * s, 12.5f * s), p0 + new Vector2(12.6f * s, 12.5f * s), col, t);
                 break;
 
             case PigModule.Type:

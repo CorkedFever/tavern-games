@@ -4,6 +4,7 @@ using TavernGames.Core.Games.LiarsDice;
 using TavernGames.Core.Games.Mia;
 using TavernGames.Core.Games.Pig;
 using TavernGames.Core.Games.Roulette;
+using TavernGames.Core.Games.ShipCaptainCrew;
 
 namespace TavernGames.Core.Platform;
 
@@ -48,6 +49,7 @@ public static class GameCatalog
         HoldemModule.Descriptor,
         MiaModule.Descriptor,
         RouletteModule.Descriptor,
+        ShipCaptainCrewModule.Descriptor,
     ];
 
     public static GameDescriptor? Find(string? type) =>

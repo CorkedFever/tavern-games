@@ -25,7 +25,7 @@ public sealed class Plugin : IDalamudPlugin
     internal GameSession Session { get; } = new(
     [
         new LiarsDiceClient(), new PigClient(), new MiaClient(),
-        new BlackjackClient(), new HoldemClient(), new RouletteClient(),
+        new BlackjackClient(), new HoldemClient(), new RouletteClient(), new ShipCaptainCrewClient(),
     ]);
     internal AccountState Account { get; } = new();
 

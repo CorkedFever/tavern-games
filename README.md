@@ -5,7 +5,7 @@ a table of tavern games in your game window, plus the relay server that connects
 players. Open a room, share the code, fill empty seats with bots, and let onlookers
 spectate.
 
-**Games so far:** Liar's Dice, Pig, Mia, Blackjack, Texas Hold'em, Roulette.
+**Games so far:** Liar's Dice, Pig, Mia, Blackjack, Texas Hold'em, Roulette, Ship, Captain & Crew.
 
 > Like all Dalamud plugins, this is a third-party tool and using it is against the
 > FFXIV Terms of Service. Build and run at your own risk. Wagers are flavor only: the
@@ -69,7 +69,8 @@ Back that file up and you've backed up everything.
 4. **Tests**: engine rules, a bot fuzz (every bot move must be legal and games must
    end), and one end-to-end game in `TavernGames.Server.Tests`.
 
-No platform code changes. Pig was added this way as the proof.
+No platform code changes. Pig was added this way as the proof. Games that fit the table but
+aren't built yet are listed in [IDEAS.md](IDEAS.md), with what each would reuse and need.
 
 **Card games** build on `TavernGames.Core/Cards`: `Card` (two-character wire codes, `"??"`
 for a card the receiver may not see), `Deck` (cryptographic shuffle, or `Deck.Stacked` for
@@ -198,3 +199,11 @@ A number pays 35 to 1, dozens and columns 2 to 1, the rest even money, and a zer
 outside bet. The pocket comes from the OS's cryptographic generator. After the set number of
 spins the biggest stack wins; ties go to the earlier seat. Splits, streets and corners are not
 offered.
+
+**Ship, Captain & Crew** (2-6 players). The bar dice game: five dice, three rolls a turn. A 6 is
+the ship, a 5 the captain, a 4 the crew, and they must come aboard in that order, so a captain
+thrown before the ship is lost with the next throw. Once all three are aboard the other two
+dice are the cargo; with rolls left you can throw both cargo dice again or hold. No crew after
+three rolls is no cargo. The best cargo takes the round, tied seats roll it off between
+themselves, and if nobody gets a crew the round is thrown again. First to the set number of
+rounds wins.
