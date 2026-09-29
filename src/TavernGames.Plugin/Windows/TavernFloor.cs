@@ -7,6 +7,7 @@ using TavernGames.Core.Games.Holdem;
 using TavernGames.Core.Games.LiarsDice;
 using TavernGames.Core.Games.Mia;
 using TavernGames.Core.Games.Pig;
+using TavernGames.Core.Games.Roulette;
 using TavernGames.Core.Platform;
 using TavernGames.Plugin.Game;
 
@@ -246,6 +247,18 @@ internal sealed class TavernFloor
                 dl.AddLine(c + new Vector2(0f, 9f * s), c + new Vector2(0f, 6f * s), col, t);
                 dl.AddLine(c + new Vector2(-9f * s, 0f), c + new Vector2(-6f * s, 0f), col, t);
                 dl.AddLine(c + new Vector2(9f * s, 0f), c + new Vector2(6f * s, 0f), col, t);
+                break;
+
+            case RouletteModule.Type:
+                dl.AddCircle(c, 9.5f * s, col, 32, t);
+                dl.AddCircle(c, 3.5f * s, col, 16, t);
+                for (var k = 0; k < 8; k++)
+                {
+                    var a = k * MathF.PI / 4f;
+                    var d = new Vector2(MathF.Cos(a), MathF.Sin(a));
+                    dl.AddLine(c + d * 3.5f * s, c + d * 9.5f * s, col, t * 0.8f);
+                }
+                dl.AddCircleFilled(c + new Vector2(0f, -6.8f * s), 1.6f * s, col, 10);
                 break;
 
             case PigModule.Type:

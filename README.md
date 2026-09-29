@@ -5,7 +5,7 @@ a table of tavern games in your game window, plus the relay server that connects
 players. Open a room, share the code, fill empty seats with bots, and let onlookers
 spectate.
 
-**Games so far:** Liar's Dice, Pig, Mia, Blackjack, Texas Hold'em.
+**Games so far:** Liar's Dice, Pig, Mia, Blackjack, Texas Hold'em, Roulette.
 
 > Like all Dalamud plugins, this is a third-party tool and using it is against the
 > FFXIV Terms of Service. Build and run at your own risk. Wagers are flavor only: the
@@ -189,3 +189,12 @@ truthfully or otherwise. The next player either believes you, takes the cup and 
 beat what they just accepted, or calls liar: your dice come out, and whoever was wrong
 loses a life. A Mia costs two lives, and since nothing beats it the player facing one
 may concede a single life instead of calling. Last player with lives wins.
+
+
+**Roulette** (1-6 players against the house). European, single zero. Each spin everyone puts
+chips on the layout, straight numbers or the outside bets (red or black, odd or even, low or
+high, a dozen, a column), and says when their bets are down; the wheel turns once everyone has.
+A number pays 35 to 1, dozens and columns 2 to 1, the rest even money, and a zero takes every
+outside bet. The pocket comes from the OS's cryptographic generator. After the set number of
+spins the biggest stack wins; ties go to the earlier seat. Splits, streets and corners are not
+offered.
