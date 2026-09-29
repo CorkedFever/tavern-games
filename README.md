@@ -114,12 +114,40 @@ leaderboards are server-only and simply don't appear in solo play.
 1. In `/xlsettings` → Experimental → Dev Plugin Locations, add
    `src/TavernGames.Plugin/bin/Release/TavernGames.dll`, then enable it in `/xlplugins`.
 2. In game, run `/tavern`.
-3. Set the server URL (default `ws://localhost:5050/ws`) and connect. On the **Play**
-   tab pick a game and **Create Room**, or **Join** / **Spectate** with a 4-character
-   code. The host can add bots and starts the game.
-4. The **Venues** tab is where you join a venue by code or start your own, see its open
-   tables, leaderboard and members. Staff get a "Host for" picker on the Play tab.
-5. The **Profile** tab holds your name, tagline and record.
+
+### The window
+
+The window is your seat and the table beside it, drawn in the same near-black shell as
+[Aetherstream](https://github.com/CorkedFever/Aetherstream) so the two read as siblings.
+
+- **Your seat** is the left column and never changes place: a display strip that says what the
+  table wants of you (`YOUR TURN`, `LIAR!`, `PLACE YOUR BET`), your name, what only you can see
+  (your dice under the cup, your hole cards), and the keys for what you can do. Fold the window
+  with the `_` in the title bar and only the seat stays, so a game can be played from a corner of
+  the screen while the roleplay carries on; the last thing that happened is written at its foot.
+  Setup can fold it for you the moment a game starts.
+- **The table** shows the tavern floor until you sit down: the games as tiles, and a dock with
+  Join a code, Venues, Profile and Setup. A game's tile opens its screen, with the rules the host
+  can set and two ways to play it: **Play vs bots** needs no server, **Open a table** needs one
+  and gets a 4-letter code (staff can host it for a venue). At a table the column becomes the
+  felt: a plate for every seat, lit for whoever is on the clock, with the standing bid, the pot
+  and board, or the room code in the middle, and the log underneath.
+
+The rule that decides where something is drawn is the same one the server uses: the felt shows
+what the server sent to everyone, your seat shows what it sent only to you.
+
+What happens is staged, not just logged: dice tumble before they settle, cards are dealt and
+turned over, a call stamps `LIAR!` or `THE BID HELD` across the felt, chips fly to whoever won
+the pot, the losing seat flashes red, and the end of the game is `VICTORY` with confetti or
+`DEFEAT`. Your seat lights up and a chime plays when the table turns to you. The sounds are the
+plugin's own, made from sine waves and noise so none of them can be mistaken for a tell, and they
+play outside the game's mixer with their own volume slider; a 16-bit WAV named after a cue in the
+plugin's `Sounds` config folder replaces it. Both the staging and the sounds can be turned off
+under Setup.
+
+The display face is [VT323](https://fonts.google.com/specimen/VT323) (SIL OFL, shipped in
+`Fonts\` with its licence), used only for short labels: headings, keys, codes and the words in the
+middle of the felt. Anything that might be long stays in the game's own font.
 
 ## The games
 

@@ -1,3 +1,4 @@
+using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using TavernGames.Core;
 using TavernGames.Core.Platform;
@@ -9,7 +10,7 @@ namespace TavernGames.Plugin.Windows;
 /// Venues: persistent groups with a join code, their own open tables, and a leaderboard.
 /// Shows either the list of your venues or the one you've opened.
 /// </summary>
-internal sealed class VenuesTab(Plugin plugin, Action<string> hostTableFor)
+internal sealed class VenuesApp(Plugin plugin, Action<string> hostTableFor)
 {
     // List view forms.
     private string _joinCode = "";
@@ -28,7 +29,7 @@ internal sealed class VenuesTab(Plugin plugin, Action<string> hostTableFor)
         var account = plugin.Account;
         if (!account.HasProfile)
         {
-            ImGui.TextWrapped("Venues need a player profile. Create one on the Profile tab.");
+            Ui.Hint("Venues need a player profile on this server. Connect, and the server gives you one.");
             return;
         }
 
@@ -44,34 +45,34 @@ internal sealed class VenuesTab(Plugin plugin, Action<string> hostTableFor)
     {
         var account = plugin.Account;
 
-        ImGui.TextUnformatted("Your venues");
+        Theme.Heading("Your venues");
         if (account.Venues.Count == 0)
-            ImGui.TextDisabled("None yet. Join one with a code, or start your own below.");
+            Ui.Hint("None yet. Join one with a code, or start your own below.");
 
         foreach (var v in account.Venues)
         {
             if (ImGui.Selectable($"{v.Name}##{v.Id}"))
                 Open(v.Id);
             ImGui.SameLine(260);
-            ImGui.TextDisabled($"{RoleName(v.MyRole)}, {v.MemberCount} member{(v.MemberCount == 1 ? "" : "s")}");
+            ImGui.TextColored(Theme.TextFaint, $"{RoleName(v.MyRole)}, {v.MemberCount} member{(v.MemberCount == 1 ? "" : "s")}");
         }
 
-        ImGui.Separator();
-        ImGui.TextUnformatted("Join a venue");
-        ImGui.SetNextItemWidth(120);
-        ImGui.InputText("Venue code", ref _joinCode, 8);
+        Theme.Heading("Join a venue");
+        ImGui.SetNextItemWidth(140f);
+        var entered = ImGui.InputTextWithHint("##venuecode", "venue code", ref _joinCode, 8, ImGuiInputTextFlags.EnterReturnsTrue);
         ImGui.SameLine();
-        if (ImGui.Button("Join##venue") && _joinCode.Trim().Length > 0)
+        if ((ImGui.Button("Join##venue") || entered) && _joinCode.Trim().Length > 0)
         {
             plugin.Client.Send(new JoinVenue(_joinCode.Trim()));
             _joinCode = "";
         }
-        ImGui.TextDisabled("A venue's staff can give you its code.");
+        Ui.Hint("A venue's staff can give you its code.");
 
-        ImGui.Separator();
-        ImGui.TextUnformatted("Start a venue");
-        ImGui.InputText("Name##newvenue", ref _newName, 40);
-        ImGui.InputText("Description##newvenue", ref _newDescription, 200);
+        Theme.Heading("Start a venue");
+        ImGui.SetNextItemWidth(220f);
+        ImGui.InputTextWithHint("Name##newvenue", "The Drowning Wench", ref _newName, 40);
+        ImGui.SetNextItemWidth(220f);
+        ImGui.InputTextWithHint("Description##newvenue", "open Fridays from eight bells", ref _newDescription, 200);
         ImGui.BeginDisabled(_newName.Trim().Length < 3);
         if (ImGui.Button("Create venue"))
         {
@@ -79,7 +80,7 @@ internal sealed class VenuesTab(Plugin plugin, Action<string> hostTableFor)
             _newName = _newDescription = "";
         }
         ImGui.EndDisabled();
-        ImGui.TextDisabled("You'll get a join code to hand out. Staff you appoint can host tables for the venue.");
+        Ui.Hint("You'll get a join code to hand out. Staff you appoint can host tables for the venue.");
     }
 
     private void Open(string venueId)
@@ -98,15 +99,16 @@ internal sealed class VenuesTab(Plugin plugin, Action<string> hostTableFor)
         var isStaff = venue.MyRole >= VenueRole.Staff;
         var isOwner = venue.MyRole == VenueRole.Owner;
 
+        ImGui.AlignTextToFramePadding();
         if (ImGui.SmallButton("< Venues"))
         {
             account.CloseVenue();
             return;
         }
+        ImGui.SameLine(0f, 10f);
+        ImGui.TextColored(Theme.Accent, venue.Name);
         ImGui.SameLine();
-        ImGui.TextColored(TableUi.Gold, venue.Name);
-        ImGui.SameLine();
-        ImGui.TextDisabled($"({RoleName(venue.MyRole)})");
+        ImGui.TextColored(Theme.TextFaint, $"{RoleName(venue.MyRole)} · {venue.Members.Length} member{(venue.Members.Length == 1 ? "" : "s")}");
         ImGui.SameLine();
         if (ImGui.SmallButton("Refresh##venue"))
         {
@@ -115,29 +117,29 @@ internal sealed class VenuesTab(Plugin plugin, Action<string> hostTableFor)
         }
 
         if (venue.Description.Length > 0)
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, Theme.TextDim);
             ImGui.TextWrapped(venue.Description);
+            ImGui.PopStyleColor();
+        }
 
         if (venue.JoinCode is { } code)
         {
             ImGui.AlignTextToFramePadding();
-            ImGui.TextUnformatted("Join code:");
+            ImGui.TextColored(Theme.TextFaint, "Join code");
             ImGui.SameLine();
-            ImGui.TextColored(TableUi.Cyan, code);
+            Theme.Displayed(Theme.Accent, code);
             ImGui.SameLine();
             if (ImGui.SmallButton("Copy"))
                 ImGui.SetClipboardText(code);
+            Ui.Tip("Hand it to whoever should be a member.");
             ImGui.SameLine();
             if (ConfirmButton("New code", "code", "The old code stops working. Sure?"))
                 plugin.Client.Send(new RegenerateVenueCode(venue.Id));
         }
 
-        ImGui.Separator();
         DrawTables(venue, isStaff);
-
-        ImGui.Separator();
         DrawLeaderboard(venue);
-
-        ImGui.Separator();
         DrawMembers(venue, isStaff, isOwner);
 
         if (isOwner && ImGui.CollapsingHeader("Edit venue"))
@@ -149,7 +151,9 @@ internal sealed class VenuesTab(Plugin plugin, Action<string> hostTableFor)
                 _editDescription = venue.Description;
                 _editLoadedFor = stamp;
             }
+            ImGui.SetNextItemWidth(220f);
             ImGui.InputText("Name##editvenue", ref _editName, 40);
+            ImGui.SetNextItemWidth(220f);
             ImGui.InputText("Description##editvenue", ref _editDescription, 200);
             ImGui.BeginDisabled(_editName.Trim().Length < 3);
             if (ImGui.Button("Save venue"))
@@ -157,7 +161,7 @@ internal sealed class VenuesTab(Plugin plugin, Action<string> hostTableFor)
             ImGui.EndDisabled();
         }
 
-        ImGui.Separator();
+        ImGui.Dummy(new Vector2(0f, 8f));
         if (isOwner)
         {
             if (ConfirmButton("Delete venue...", "delete", "This removes the venue and its leaderboard for everyone."))
@@ -171,17 +175,17 @@ internal sealed class VenuesTab(Plugin plugin, Action<string> hostTableFor)
 
     private void DrawTables(VenueInfo venue, bool isStaff)
     {
-        ImGui.TextUnformatted("Open tables");
+        Theme.Heading("Open tables");
         if (isStaff)
         {
-            ImGui.SameLine();
             if (ImGui.SmallButton("Host a table..."))
                 hostTableFor(venue.Id);
+            Ui.Tip("Open a table for this venue: members find it here, and the result counts on the leaderboard.");
         }
 
         if (venue.Tables.Length == 0)
         {
-            ImGui.TextDisabled(isStaff ? "None right now. Host one to get things going." : "None right now. Staff open tables for the venue.");
+            Ui.Hint(isStaff ? "None right now. Host one to get things going." : "None right now. Staff open tables for the venue.");
             return;
         }
 
@@ -189,15 +193,21 @@ internal sealed class VenuesTab(Plugin plugin, Action<string> hostTableFor)
         {
             var game = GameCatalog.Find(table.GameType)?.DisplayName ?? table.GameType;
             var inLobby = table.Phase == GamePhase.Lobby;
+            var open = inLobby && table.Players < table.MaxPlayers;
+
             ImGui.AlignTextToFramePadding();
-            ImGui.TextUnformatted($"{game}, hosted by {table.HostName}");
+            Ui.Dot(open ? Theme.Good : inLobby ? Theme.TextFaint : Theme.Accent, open ? "seats free" : inLobby ? "full" : "in progress");
+            ImGui.SameLine(0f, 4f);
+            ImGui.TextUnformatted(game);
             ImGui.SameLine();
-            ImGui.TextDisabled(inLobby ? $"{table.Players}/{table.MaxPlayers} seated" : "in progress");
+            ImGui.TextColored(Theme.TextDim, $"hosted by {table.HostName}");
+            ImGui.SameLine();
+            ImGui.TextColored(Theme.TextFaint, inLobby ? $"{table.Players}/{table.MaxPlayers} seated" : "in progress");
 
             ImGui.SameLine();
-            if (inLobby && table.Players < table.MaxPlayers)
+            if (open)
             {
-                if (ImGui.SmallButton($"Join##{table.RoomCode}"))
+                if (ImGui.SmallButton($"Sit down##{table.RoomCode}"))
                     plugin.Client.Send(new JoinRoom(table.RoomCode, plugin.ResolvePlayerName()));
                 ImGui.SameLine();
             }
@@ -209,26 +219,19 @@ internal sealed class VenuesTab(Plugin plugin, Action<string> hostTableFor)
     private void DrawLeaderboard(VenueInfo venue)
     {
         var account = plugin.Account;
+        Theme.Heading("Leaderboard");
 
-        ImGui.AlignTextToFramePadding();
-        ImGui.TextUnformatted("Leaderboard");
-        ImGui.SameLine();
-        ImGui.SetNextItemWidth(160);
-        var label = _boardGame is null ? "All games" : GameCatalog.Find(_boardGame)?.DisplayName ?? _boardGame;
-        if (ImGui.BeginCombo("##boardgame", label))
-        {
-            if (ImGui.Selectable("All games", _boardGame is null))
-                SetBoardGame(venue.Id, null);
-            foreach (var game in GameCatalog.Games)
-                if (ImGui.Selectable(game.DisplayName, _boardGame == game.Type))
-                    SetBoardGame(venue.Id, game.Type);
-            ImGui.EndCombo();
-        }
+        var labels = new List<string> { "All games" };
+        labels.AddRange(GameCatalog.Games.Select(g => g.DisplayName));
+        var selected = _boardGame is null ? 0 : 1 + GameCatalog.Games.ToList().FindIndex(g => g.Type == _boardGame);
+        var pressed = Ui.Chips("board", labels, selected);
+        if (pressed >= 0)
+            SetBoardGame(venue.Id, pressed == 0 ? null : GameCatalog.Games[pressed - 1].Type);
 
         var rows = account.LeaderboardVenueId == venue.Id ? account.Leaderboard : [];
         if (rows.Length == 0)
         {
-            ImGui.TextDisabled("No ranked games yet. A game counts once 2 or more real players sit down.");
+            Ui.Hint("No ranked games yet. A game counts once 2 or more real players sit down.");
             return;
         }
 
@@ -249,7 +252,7 @@ internal sealed class VenuesTab(Plugin plugin, Action<string> hostTableFor)
                 ImGui.TableNextColumn();
                 ImGui.TextUnformatted((i + 1).ToString());
                 ImGui.TableNextColumn();
-                if (mine) ImGui.TextColored(TableUi.TurnGreen, row.DisplayName + " (you)");
+                if (mine) ImGui.TextColored(Theme.Accent, row.DisplayName + " (you)");
                 else ImGui.TextUnformatted(row.DisplayName);
                 ImGui.TableNextColumn();
                 ImGui.TextUnformatted(row.Won.ToString());
@@ -270,6 +273,7 @@ internal sealed class VenuesTab(Plugin plugin, Action<string> hostTableFor)
 
     private void DrawMembers(VenueInfo venue, bool isStaff, bool isOwner)
     {
+        ImGui.Dummy(new Vector2(0f, 6f));
         if (!ImGui.CollapsingHeader($"Members ({venue.Members.Length})###members"))
             return;
 
@@ -279,7 +283,7 @@ internal sealed class VenuesTab(Plugin plugin, Action<string> hostTableFor)
             ImGui.AlignTextToFramePadding();
             ImGui.TextUnformatted(member.DisplayName + (member.ProfileId == myId ? " (you)" : ""));
             ImGui.SameLine();
-            ImGui.TextDisabled(member.Tagline.Length > 0 ? $"{RoleName(member.Role)}, {member.Tagline}" : RoleName(member.Role));
+            ImGui.TextColored(Theme.TextFaint, member.Tagline.Length > 0 ? $"{RoleName(member.Role)}, {member.Tagline}" : RoleName(member.Role));
 
             if (member.ProfileId == myId) continue;
 
@@ -325,7 +329,7 @@ internal sealed class VenuesTab(Plugin plugin, Action<string> hostTableFor)
             return false;
         }
 
-        ImGui.TextColored(TableUi.Red, warning);
+        ImGui.TextColored(Theme.Bad, warning);
         var confirmed = ImGui.SmallButton($"Yes##{key}");
         ImGui.SameLine();
         var cancelled = ImGui.SmallButton($"No##{key}");

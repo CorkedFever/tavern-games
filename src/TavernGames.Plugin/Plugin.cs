@@ -56,6 +56,9 @@ public sealed class Plugin : IDalamudPlugin
 
             Config = pluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
             Client = new GameClient(log);
+            Theme.DisplayFace = new DisplayFont(pluginInterface, log);
+            Sound.Directory = Path.Combine(pluginInterface.ConfigDirectory.FullName, "Sounds");
+            Sound.Volume = Config.SoundVolume / 100f;
 
             _mainWindow = new MainWindow(this);
             _windows.AddWindow(_mainWindow);
@@ -67,7 +70,7 @@ public sealed class Plugin : IDalamudPlugin
 
             pluginInterface.UiBuilder.Draw += _windows.Draw;
             pluginInterface.UiBuilder.OpenMainUi += ToggleMainWindow;
-            pluginInterface.UiBuilder.OpenConfigUi += ToggleMainWindow;
+            pluginInterface.UiBuilder.OpenConfigUi += OpenSetup;
             framework.Update += OnFrameworkUpdate;
 
             log.Information("Tavern Games: constructor done");
@@ -181,15 +184,19 @@ public sealed class Plugin : IDalamudPlugin
 
     private void ToggleMainWindow() => _mainWindow.Toggle();
 
+    /// <summary>Dalamud's settings button opens the window on Setup.</summary>
+    private void OpenSetup() => _mainWindow.OpenApp("setup");
+
     public void Dispose()
     {
         // Each step guarded so one failure can't block the rest of teardown.
         try { Framework.Update -= OnFrameworkUpdate; } catch (Exception ex) { Log.Error(ex, "unsub Framework.Update"); }
         try { PluginInterface.UiBuilder.Draw -= _windows.Draw; } catch (Exception ex) { Log.Error(ex, "unsub Draw"); }
         try { PluginInterface.UiBuilder.OpenMainUi -= ToggleMainWindow; } catch (Exception ex) { Log.Error(ex, "unsub OpenMainUi"); }
-        try { PluginInterface.UiBuilder.OpenConfigUi -= ToggleMainWindow; } catch (Exception ex) { Log.Error(ex, "unsub OpenConfigUi"); }
+        try { PluginInterface.UiBuilder.OpenConfigUi -= OpenSetup; } catch (Exception ex) { Log.Error(ex, "unsub OpenConfigUi"); }
         try { _windows.RemoveAllWindows(); } catch (Exception ex) { Log.Error(ex, "RemoveAllWindows"); }
         try { CommandManager.RemoveHandler(CommandName); } catch (Exception ex) { Log.Error(ex, "RemoveHandler"); }
         try { Client?.Dispose(); } catch (Exception ex) { Log.Error(ex, "Client.Dispose"); }
+        try { Theme.DisplayFace?.Dispose(); Theme.DisplayFace = null; } catch (Exception ex) { Log.Error(ex, "DisplayFont.Dispose"); }
     }
 }

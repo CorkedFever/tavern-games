@@ -1,17 +1,19 @@
+using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using TavernGames.Core.Platform;
 using TavernGames.Core.Protocol;
+using TavernGames.Plugin.Game;
 
 namespace TavernGames.Plugin.Windows;
 
 /// <summary>
 /// Your player profile: the name and tagline you show at tables, and your record. It is
-/// local-first, so it works with no server. Your name and tagline live in the plugin
-/// config and are used at every table; when you're connected to a server, saving also
-/// pushes them up so leaderboards show the same name. Your record is kept per game on
-/// this device and counts offline games too.
+/// local-first, so it works with no server. Your name and tagline live in the plugin config
+/// and are used at every table; when you're connected to a server, saving also pushes them up
+/// so leaderboards show the same name. Your record is kept per game on this device and counts
+/// offline games too.
 /// </summary>
-internal sealed class ProfileTab(Plugin plugin)
+internal sealed class ProfileApp(Plugin plugin)
 {
     private string _name = "";
     private string _tagline = "";
@@ -27,15 +29,15 @@ internal sealed class ProfileTab(Plugin plugin)
             _loaded = true;
         }
 
-        ImGui.TextColored(TableUi.Gold, "Player profile");
-        ImGui.Spacing();
+        Theme.Heading("At the table");
+        ImGui.SetNextItemWidth(220f);
+        ImGui.InputTextWithHint("Display name", "your character's name", ref _name, 24);
+        Ui.Hint("Leave blank to use your character name.");
+        ImGui.SetNextItemWidth(220f);
+        ImGui.InputTextWithHint("Tagline", "the masked gambler", ref _tagline, 60);
+        Ui.Hint("Shown under your name on your seat and to the venue.");
 
-        ImGui.InputText("Display name", ref _name, 24);
-        ImGui.TextDisabled("Leave blank to use your character name.");
-        ImGui.InputText("Tagline", ref _tagline, 60);
-        ImGui.TextDisabled("Shown under your name. e.g. \"the masked gambler\"");
-
-        var online = plugin.Client.State == Game.ConnectionState.Connected && !plugin.Client.IsLocal;
+        var online = plugin.Client.State == ConnectionState.Connected && !plugin.Client.IsLocal;
         var changed = _name.Trim() != config.PlayerName || _tagline.Trim() != config.Tagline;
 
         ImGui.BeginDisabled(!changed);
@@ -49,20 +51,20 @@ internal sealed class ProfileTab(Plugin plugin)
                 plugin.Client.Send(new UpdateProfile(config.PlayerName, config.Tagline));
         }
         ImGui.EndDisabled();
-
         if (online)
-            ImGui.TextDisabled("Connected: saving also updates your name on this server.");
+        {
+            ImGui.SameLine();
+            ImGui.TextColored(Theme.TextFaint, "Saving also updates your name on this server.");
+        }
 
-        ImGui.Separator();
         DrawRecord();
     }
 
     private void DrawRecord()
     {
         var config = plugin.Config;
-        ImGui.TextUnformatted("Your record");
-        ImGui.SameLine();
-        ImGui.TextDisabled("(this device, offline games included)");
+        Theme.Heading("Your record");
+        Ui.Hint("This device, offline games included. A venue's leaderboard counts only games with two or more real players.");
 
         var rows = GameCatalog.Games
             .Select(g => (Game: g, Played: config.LocalPlayed.GetValueOrDefault(g.Type), Won: config.LocalWon.GetValueOrDefault(g.Type)))
@@ -71,7 +73,8 @@ internal sealed class ProfileTab(Plugin plugin)
 
         if (rows.Count == 0)
         {
-            ImGui.TextDisabled("No finished games yet. Play one against the bots!");
+            ImGui.Dummy(new Vector2(0f, 4f));
+            ImGui.TextColored(Theme.TextDim, "No finished games yet. Play one against the bots!");
             return;
         }
 

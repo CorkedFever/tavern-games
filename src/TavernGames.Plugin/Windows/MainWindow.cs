@@ -8,60 +8,103 @@ using TavernGames.Core.Protocol;
 namespace TavernGames.Plugin.Windows;
 
 /// <summary>
-/// The shell every game shares: connect, pick a game and open or join a room, the
-/// room lobby, game over, and the log. While a game is being played the active
-/// <see cref="Game.IClientGame"/> draws the table.
+/// The window: your seat on the left and the table beside it. The seat is always there; the
+/// table shows the tavern floor until you sit down, then the felt. Folding the window puts the
+/// table away and leaves the seat alone in a corner of the screen, still playable.
+/// <para>
+/// The whole thing is drawn by hand on a near-black shell, Aetherstream's way, so the two read
+/// as siblings on the same screen. The style is pushed in PreDraw and popped in PostDraw, and
+/// every section is guarded so a bug in one game can't take the window down.
+/// </para>
 /// </summary>
 public sealed class MainWindow : Window
 {
+    private const float TitleBarHeight = 34f;
+    private const float ColumnGap = 12f;
+    private const float LogHeight = 96f;
+
     private readonly Plugin _plugin;
+    private readonly SeatColumn _seat;
+    private readonly TavernFloor _floor;
 
-    // Form fields persisted across frames.
-    private string _serverUrl;
-    private string _gameType;
-    private float _turnDelaySec;
-    private string _joinCode = "";
-    private string? _hostVenueId;   // host the next table for this venue (null = private table)
-    private bool _jumpToPlayTab;
-    private int _offlineBots = 3;
+    private Vector2 _unfoldedSize = new(760f, 600f);
+    private Vector2? _sizeToRestore;
+    private GamePhase _lastPhase = GamePhase.Lobby;
+    private string _lastDrawError = "";
 
-    private readonly ProfileTab _profileTab;
-    private readonly VenuesTab _venuesTab;
-
-    public MainWindow(Plugin plugin) : base("Tavern Games##TavernGamesMain")
+    public MainWindow(Plugin plugin) : base("Tavern Games###TavernGamesMain")
     {
         _plugin = plugin;
-        _profileTab = new ProfileTab(plugin);
-        _venuesTab = new VenuesTab(plugin, venueId =>
-        {
-            _hostVenueId = venueId;
-            _jumpToPlayTab = true;
-        });
-        _serverUrl = plugin.Config.ServerUrl;
-        _gameType = GameCatalog.Find(plugin.Config.LastGameType)?.Type ?? GameCatalog.Games[0].Type;
-        _turnDelaySec = plugin.Config.TurnDelayMs / 1000f;
+        _seat = new SeatColumn(plugin, LeaveRoom, Guarded);
+        _floor = new TavernFloor(plugin);
 
-        SizeConstraints = new WindowSizeConstraints
-        {
-            MinimumSize = new Vector2(380, 320),
-            MaximumSize = new Vector2(900, 1200),
-        };
-        Size = new Vector2(440, 540);
+        Size = _unfoldedSize;
         SizeCondition = ImGuiCond.FirstUseEver;
+        Flags = ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse;
     }
 
     private Game.GameClient Client => _plugin.Client;
     private Game.GameSession Session => _plugin.Session;
+    private bool Folded => _plugin.Config.WindowFolded;
 
-    private string _lastDrawError = "";
+    /// <summary>Shows something from the dock (setup, say), unfolding and opening the window if need be.</summary>
+    public void OpenApp(string key)
+    {
+        _floor.OpenApp(key);
+        if (Folded)
+            ToggleFold();
+        IsOpen = true;
+    }
 
-    public override void Draw() => Guarded("window", DrawContent);
+    public override void PreDraw()
+    {
+        var folded = Folded;
+
+        // Folded, the window shrinks to the seat rather than leaving a dark slab beside it.
+        Flags = ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse
+            | (folded ? ImGuiWindowFlags.AlwaysAutoResize : ImGuiWindowFlags.None);
+
+        SizeConstraints = folded
+            ? new WindowSizeConstraints { MinimumSize = new Vector2(SeatColumn.BodyWidth + 24f, TitleBarHeight + 24f), MaximumSize = new Vector2(float.MaxValue, float.MaxValue) }
+            : new WindowSizeConstraints { MinimumSize = new Vector2(SeatColumn.BodyWidth + ColumnGap + 420f, 480f), MaximumSize = new Vector2(1600f, 1600f) };
+
+        if (_sizeToRestore is { } restore)
+        {
+            Size = restore;
+            SizeCondition = ImGuiCond.Always;
+            _sizeToRestore = null;
+        }
+        else
+        {
+            SizeCondition = ImGuiCond.FirstUseEver;
+        }
+
+        Theme.PushShell();
+    }
+
+    public override void PostDraw() => Theme.PopShell();
 
     /// <summary>
-    /// Runs one section of the UI so that a bug in it can't take the window down. Each
-    /// section is guarded from INSIDE whatever ImGui scope contains it (a tab item, the
-    /// window), so when it throws, the enclosing End call still runs and ImGui's stack
-    /// stays balanced. The same error is logged once, not once per frame.
+    /// The style pushed in PreDraw is popped in PostDraw, so an exception escaping here would
+    /// leave the stack unbalanced and restyle every other plugin's window for the rest of the
+    /// frame. Nothing in a draw call is worth that.
+    /// </summary>
+    public override void Draw()
+    {
+        try
+        {
+            DrawContents();
+        }
+        catch (Exception ex)
+        {
+            LogOnce("window", ex);
+        }
+    }
+
+    /// <summary>
+    /// Runs one section of the UI so that a bug in it can't take the window down. Each section
+    /// is guarded from inside whatever ImGui scope contains it, so when it throws the enclosing
+    /// End call still runs and ImGui's stack stays balanced. The same error is logged once.
     /// </summary>
     private void Guarded(string section, Action draw)
     {
@@ -71,338 +114,338 @@ public sealed class MainWindow : Window
         }
         catch (Exception ex)
         {
-            var signature = $"{section}: {ex.GetType().Name}: {ex.Message}";
-            if (signature != _lastDrawError)
-            {
-                _lastDrawError = signature;
-                Plugin.Log.Error(ex, "Tavern Games: UI error while drawing {Section}.", section);
-            }
-            ImGui.TextColored(TableUi.Red, "A UI error occurred here. See /xllog for details.");
+            LogOnce(section, ex);
+            ImGui.TextColored(Theme.Bad, "A UI error occurred here. See /xllog for details.");
         }
     }
 
-    private void DrawContent()
+    private void LogOnce(string section, Exception ex)
     {
-        if (Session.InRoom)
-        {
-            DrawRoomHeader();
-
-            switch (Session.Phase)
-            {
-                case GamePhase.Lobby:
-                    DrawRoomLobby();
-                    break;
-                case GamePhase.Playing when Session.ActiveGame is { } game:
-                    Guarded(game.GameType, () => game.DrawTable(Session, Client.Send));
-                    break;
-                case GamePhase.Playing:
-                    ImGui.TextColored(TableUi.Red, $"This plugin version doesn't know the game '{Session.GameType}'. Update to play it.");
-                    break;
-                case GamePhase.GameOver:
-                    DrawGameOver();
-                    break;
-            }
-
-            if (Session.Phase != GamePhase.Lobby)
-            {
-                ImGui.Spacing();
-                if (ImGui.Button(Session.IsSpectator ? "Stop watching" : "Leave")) LeaveRoom();
-            }
-        }
-        else
-        {
-            DrawEntry();
-        }
-
-        ImGui.Separator();
-        DrawLog();
+        var signature = $"{section}: {ex.GetType().Name}: {ex.Message}";
+        if (signature == _lastDrawError)
+            return;
+        _lastDrawError = signature;
+        Plugin.Log.Error(ex, "Tavern Games: UI error while drawing {Section}.", section);
     }
 
-    /// <summary>
-    /// The screen shown when you're not at a table: Play, Profile, and (when connected)
-    /// Venues. Profile is always here, so it works with no server.
-    /// </summary>
-    private void DrawEntry()
+    private void DrawContents()
     {
-        var online = Client.State == Game.ConnectionState.Connected && !Client.IsLocal;
-        if (online)
+        Fx.Enabled = _plugin.Config.Effects;
+        Sound.Enabled = _plugin.Config.Sounds;
+        Fx.Tick();
+
+        Theme.WindowFrame();
+        TrackPhase();
+        DrawTitleBar();
+
+        if (Folded)
         {
-            var profile = _plugin.Account.Profile;
-            ImGui.TextUnformatted(profile is null ? "Connected as a guest." : $"Connected as {profile.DisplayName}.");
-            ImGui.SameLine();
-            if (ImGui.SmallButton("Disconnect")) _ = Client.DisconnectAsync();
+            Guarded("seat", () => _seat.Draw(stretch: false));
+            return;
         }
 
-        if (!ImGui.BeginTabBar("##entrytabs")) return;
+        // The seat in its own column, so the table beside it scrolls without moving it.
+        if (ImGui.BeginChild("##seat", new Vector2(SeatColumn.BodyWidth, -1f), false, ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse))
+            Guarded("seat", () => _seat.Draw(stretch: true));
+        ImGui.EndChild();
 
-        var playFlags = _jumpToPlayTab ? ImGuiTabItemFlags.SetSelected : ImGuiTabItemFlags.None;
-        _jumpToPlayTab = false;
-        if (ImGui.BeginTabItem("Play", playFlags))
+        ImGui.SameLine(0f, ColumnGap);
+
+        // The seat sizes everything to its column; the table sizes to the window. If the seat
+        // threw before it could say so, this puts it right rather than squeezing the table.
+        Ui.ColumnWidth = null;
+
+        if (ImGui.BeginChild("##table", new Vector2(-1f, -1f), false, ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse))
         {
-            Guarded("play tab", online ? DrawPlayTab : DrawConnect);
-            ImGui.EndTabItem();
-        }
-        if (online && ImGui.BeginTabItem("Venues"))
-        {
-            Guarded("venues tab", _venuesTab.Draw);
-            ImGui.EndTabItem();
-        }
-        if (ImGui.BeginTabItem("Profile"))
-        {
-            Guarded("profile tab", _profileTab.Draw);
-            ImGui.EndTabItem();
-        }
-        ImGui.EndTabBar();
-    }
-
-    private void DrawConnect()
-    {
-        // Solo-vs-bots comes first: it needs no server and is the fastest way to just play.
-        ImGui.TextColored(TableUi.Gold, "Play against bots");
-        ImGui.TextDisabled("Right here, no server needed.");
-        ImGui.Spacing();
-
-        var game = DrawGameChooser();
-        DrawGameOptions(game);
-
-        var minBots = game.MinPlayers - 1;          // Blackjack allows 0 (just you and the dealer)
-        var maxBots = game.MaxPlayers - 1;
-        _offlineBots = Math.Clamp(_offlineBots, minBots, maxBots);
-        if (minBots < maxBots)
-            ImGui.SliderInt("Bots", ref _offlineBots, minBots, maxBots);
-        else
-            ImGui.TextDisabled(minBots == 0 ? "Just you against the dealer." : $"{minBots} bot(s).");
-
-        if (ImGui.Button("Play vs bots"))
-        {
-            SaveSetup(game);
-            Session.Reset();
-            Client.StartLocal(game.Type, OptionsFor(game), _plugin.Config.TurnDelayMs, _plugin.ResolvePlayerName(), _offlineBots);
-        }
-
-        ImGui.Spacing();
-        ImGui.Separator();
-        ImGui.Spacing();
-
-        // The server path is for playing with other people (and for venues and leaderboards).
-        ImGui.TextColored(TableUi.Gold, "Play with others");
-        ImGui.TextDisabled("Connect to a Tavern Games server to open or join a table with other players.");
-        ImGui.Spacing();
-
-        ImGui.InputText("Server", ref _serverUrl, 256);
-        ImGui.TextDisabled("Your name and tagline are set on the Profile tab.");
-        DrawNarrationToggle();
-        ImGui.Spacing();
-
-        if (Client.State == Game.ConnectionState.Connecting)
-        {
-            ImGui.TextColored(new Vector4(0.9f, 0.8f, 0.2f, 1f), "Connecting...");
-        }
-        else if (ImGui.Button("Connect"))
-        {
-            _plugin.Config.ServerUrl = _serverUrl;
-            _plugin.Config.Save();
-            _ = Client.ConnectAsync(_serverUrl);
-        }
-
-        if (!string.IsNullOrEmpty(Client.LastError))
-        {
-            ImGui.Spacing();
-            ImGui.TextColored(TableUi.Red, $"Error: {Client.LastError}");
-        }
-    }
-
-    /// <summary>Game picker plus its blurb; returns the chosen game and remembers the choice.</summary>
-    private GameDescriptor DrawGameChooser()
-    {
-        var game = GameCatalog.Find(_gameType) ?? GameCatalog.Games[0];
-        if (ImGui.BeginCombo("Game", game.DisplayName))
-        {
-            foreach (var candidate in GameCatalog.Games)
-                if (ImGui.Selectable(candidate.DisplayName, candidate.Type == game.Type))
-                    _gameType = candidate.Type;
-            ImGui.EndCombo();
-        }
-        ImGui.TextDisabled($"{game.Blurb} ({game.MinPlayers}-{game.MaxPlayers} players)");
-        return game;
-    }
-
-    /// <summary>Each game's room options as sliders, plus the shared game-speed slider.</summary>
-    private void DrawGameOptions(GameDescriptor game)
-    {
-        foreach (var option in game.Options)
-        {
-            var key = $"{game.Type}.{option.Key}";
-            var value = _plugin.Config.GameOptions.TryGetValue(key, out var saved) ? saved : option.Default;
-            value = Math.Clamp(value, option.Min, option.Max);
-            if (ImGui.SliderInt($"{option.Label}##{key}", ref value, option.Min, option.Max))
-                _plugin.Config.GameOptions[key] = value;
-        }
-
-        ImGui.SliderFloat("Game speed (sec/move)", ref _turnDelaySec, 0.5f, 3.0f, "%.1f s");
-    }
-
-    private Dictionary<string, int> OptionsFor(GameDescriptor game) =>
-        game.Options.ToDictionary(
-            o => o.Key,
-            o => _plugin.Config.GameOptions.TryGetValue($"{game.Type}.{o.Key}", out var v) ? v : o.Default);
-
-    private void SaveSetup(GameDescriptor game)
-    {
-        _plugin.Config.LastGameType = game.Type;
-        _plugin.Config.TurnDelayMs = (int)(_turnDelaySec * 1000);
-        _plugin.Config.Save();
-    }
-
-    private void DrawPlayTab()
-    {
-        ImGui.TextUnformatted("Open a new table");
-        var game = DrawGameChooser();
-        DrawGameOptions(game);
-        ImGui.TextDisabled("Higher speed = slower bots and longer pauses between rounds.");
-        DrawHostVenuePicker();
-
-        if (ImGui.Button("Create Room"))
-        {
-            SaveSetup(game);
-            Client.Send(new CreateRoom(_plugin.ResolvePlayerName(), game.Type, OptionsFor(game), _plugin.Config.TurnDelayMs, _hostVenueId));
-        }
-
-        ImGui.Separator();
-        ImGui.TextUnformatted("Join an existing table");
-        ImGui.InputText("Room code", ref _joinCode, 8);
-        ImGui.SameLine();
-        if (ImGui.Button("Join") && _joinCode.Trim().Length > 0)
-            Client.Send(new JoinRoom(_joinCode.Trim(), _plugin.ResolvePlayerName()));
-        ImGui.SameLine();
-        if (ImGui.Button("Spectate") && _joinCode.Trim().Length > 0)
-            Client.Send(new Spectate(_joinCode.Trim()));
-        ImGui.TextDisabled("Join to play, or Spectate to just watch the table.");
-    }
-
-    /// <summary>Staff and owners can open the table on behalf of one of their venues.</summary>
-    private void DrawHostVenuePicker()
-    {
-        var hostable = _plugin.Account.HostableVenues.ToList();
-        if (_hostVenueId is not null && hostable.All(v => v.Id != _hostVenueId))
-            _hostVenueId = null; // no longer staff there
-        if (hostable.Count == 0) return;
-
-        var current = hostable.FirstOrDefault(v => v.Id == _hostVenueId)?.Name ?? "Nobody (private table)";
-        if (ImGui.BeginCombo("Host for", current))
-        {
-            if (ImGui.Selectable("Nobody (private table)", _hostVenueId is null))
-                _hostVenueId = null;
-            foreach (var venue in hostable)
-                if (ImGui.Selectable($"{venue.Name}##{venue.Id}", venue.Id == _hostVenueId))
-                    _hostVenueId = venue.Id;
-            ImGui.EndCombo();
-        }
-        if (_hostVenueId is not null)
-            ImGui.TextDisabled("Members can join from the venue page, and the result counts on its leaderboard.");
-    }
-
-    /// <summary>Which game, which room, and whether you're only watching.</summary>
-    private void DrawRoomHeader()
-    {
-        var name = GameCatalog.Find(Session.GameType)?.DisplayName ?? Session.GameType;
-        ImGui.TextColored(TableUi.Gold, name);
-        ImGui.SameLine();
-        ImGui.TextDisabled("room");
-        ImGui.SameLine();
-        ImGui.TextColored(TableUi.Cyan, Session.RoomCode);
-        if (Session.IsSpectator)
-        {
-            ImGui.SameLine();
-            ImGui.TextColored(TableUi.Cyan, "(spectating)");
-        }
-        if (Session.VenueName is { } venueName)
-            ImGui.TextDisabled($"Hosted by {venueName}");
-        ImGui.Separator();
-    }
-
-    private void DrawRoomLobby()
-    {
-        var game = GameCatalog.Find(Session.GameType);
-        var minPlayers = game?.MinPlayers ?? 2;
-        var maxPlayers = game?.MaxPlayers ?? 6;
-
-        ImGui.TextDisabled("Share the room code so others can join or spectate.");
-        ImGui.Spacing();
-        ImGui.TextUnformatted($"Players ({Session.Players.Count}/{maxPlayers}):");
-        foreach (var p in Session.Players)
-        {
-            var you = p.Id == Session.MyId ? " (you)" : "";
-            var host = p.Id == Session.HostId ? " [host]" : "";
-            var bot = p.IsBot ? " (bot)" : "";
-            ImGui.BulletText($"{p.Name}{you}{host}{bot}");
-            if (Session.IsHost && p.IsBot)
-            {
-                ImGui.SameLine();
-                if (ImGui.SmallButton($"Remove##{p.Id}"))
-                    Client.Send(new RemoveBot(p.Id));
-            }
-        }
-
-        ImGui.Spacing();
-        if (Session.IsHost)
-        {
-            ImGui.BeginDisabled(Session.Players.Count >= maxPlayers);
-            if (ImGui.Button("Add Bot"))
-                Client.Send(new AddBot());
-            ImGui.EndDisabled();
-            ImGui.SameLine();
-
-            var canStart = Session.Players.Count >= minPlayers;
-            ImGui.BeginDisabled(!canStart);
-            if (ImGui.Button("Start Game"))
-                Client.Send(new StartGame());
-            ImGui.EndDisabled();
-            if (!canStart)
-                ImGui.TextDisabled($"Need at least {minPlayers} players. Add a bot to play solo.");
-        }
-        else
-        {
-            ImGui.TextDisabled("Waiting for the host to start...");
-        }
-
-        if (ImGui.Button(Session.IsSpectator ? "Stop watching" : "Leave")) LeaveRoom();
-    }
-
-    private void DrawGameOver()
-    {
-        var winner = Session.WinnerId is { } w ? Session.NameOf(w) : "nobody";
-        ImGui.TextColored(TableUi.Gold, $"{winner} wins!");
-        ImGui.Spacing();
-        TableUi.Roster(Session);
-    }
-
-    private void DrawLog()
-    {
-        ImGui.TextDisabled("Log");
-        if (ImGui.BeginChild("##log", new Vector2(0, 120), true))
-        {
-            foreach (var line in Session.Log)
-                ImGui.TextWrapped(line);
-            if (ImGui.GetScrollY() >= ImGui.GetScrollMaxY() - 2)
-                ImGui.SetScrollHereY(1f);
+            if (Session.InRoom)
+                DrawRoom();
+            else
+                Guarded("floor", _floor.Draw);
         }
         ImGui.EndChild();
     }
 
-    private void DrawNarrationToggle()
+    /// <summary>
+    /// Watches the table change stage: folds to the seat the moment the cards go round, when
+    /// asked to, and stages the end of the game, which no single game message announces.
+    /// </summary>
+    private void TrackPhase()
     {
-        var narrate = _plugin.Config.NarrateToChat;
-        if (ImGui.Checkbox("Narrate moves to my chat log", ref narrate))
+        var phase = Session.InRoom ? Session.Phase : GamePhase.Lobby;
+        if (phase == _lastPhase)
+            return;
+
+        if (phase == GamePhase.Playing)
         {
-            _plugin.Config.NarrateToChat = narrate;
-            _plugin.Config.Save();
+            // Whatever the last game left playing (confetti, mostly) has no place at a new one.
+            Fx.Reset();
+            if (_plugin.Config.FoldOnDeal && !Folded && !Session.IsSpectator)
+                ToggleFold();
         }
+        else if (phase == GamePhase.GameOver && _lastPhase == GamePhase.Playing)
+        {
+            StageGameOver();
+        }
+
+        _lastPhase = phase;
+    }
+
+    /// <summary>Victory, defeat, or somebody else's win: the one moment every game shares.</summary>
+    private void StageGameOver()
+    {
+        var winner = Session.WinnerId is { } w ? Session.NameOf(w) : "Nobody";
+        if (Session.IsSpectator || Session.MyId.Length == 0)
+        {
+            Fx.StampFelt($"{winner} wins", Theme.Accent, 2.5);
+            Fx.Confetti(3.5);
+            if (Session.WinnerId is { } id) Fx.Glow(id, Theme.Good, 3.0);
+        }
+        else if (Session.WinnerId == Session.MyId)
+        {
+            Fx.StampFelt("Victory", Theme.Good, 3.0);
+            Fx.Confetti(4.5);
+            Fx.Glow(Session.MyId, Theme.Good, 4.0);
+            Sound.Victory();
+        }
+        else
+        {
+            Fx.StampFelt("Defeat", Theme.Bad, 2.5);
+            Fx.Vignette(Theme.Bad);
+            if (Session.WinnerId is { } id) Fx.Glow(id, Theme.Good, 3.0);
+            Sound.Defeat();
+        }
+    }
+
+    // -- the title bar -----------------------------------------------------------------------
+
+    /// <summary>
+    /// The nameplate, what is open, and the fold and close buttons, drawn by hand because the
+    /// whole window is drawn by hand and Dalamud's title bar would sit on it like a sticker.
+    /// </summary>
+    private void DrawTitleBar()
+    {
+        var dl = ImGui.GetWindowDrawList();
+        var origin = ImGui.GetCursorScreenPos();
+        var width = Folded ? SeatColumn.BodyWidth : ImGui.GetContentRegionAvail().X;
+
+        dl.AddRectFilled(origin, origin + new Vector2(width, TitleBarHeight), Theme.U32(Theme.TitleBarFill), 6f);
+
+        using (Theme.PushDisplay())
+        {
+            const string caption = "TAVERN GAMES";
+            var captionSize = ImGui.CalcTextSize(caption);
+            var closeWidth = ImGui.CalcTextSize("×").X + 16f;
+            var foldWidth = ImGui.CalcTextSize("_").X + 16f;
+            var buttonsWidth = closeWidth + foldWidth;
+            var buttonHeight = MathF.Max(captionSize.Y, 16f);
+
+            // The drag area stops short of the buttons: ImGui gives a click to whichever item
+            // claimed the spot first, so a bar spanning the whole width would make the close
+            // button impossible to press.
+            ImGui.InvisibleButton("##titlebar", new Vector2(MathF.Max(1f, width - buttonsWidth), TitleBarHeight));
+            if (ImGui.IsItemActive() && ImGui.IsMouseDragging(ImGuiMouseButton.Left))
+                ImGui.SetWindowPos(ImGui.GetWindowPos() + ImGui.GetIO().MouseDelta);
+
+            ImGui.SetCursorScreenPos(origin + new Vector2(12f, (TitleBarHeight - captionSize.Y) / 2f));
+            ImGui.TextColored(Theme.Text, caption);
+
+            // What is open, right-aligned against the buttons: the game and the room, or the app.
+            if (!Folded)
+            {
+                var title = Title();
+                if (title.Length > 0)
+                {
+                    title = Ui.Ellipsis(title, 34).ToUpperInvariant();
+                    var titleSize = ImGui.CalcTextSize(title);
+                    ImGui.SetCursorScreenPos(origin + new Vector2(width - titleSize.X - buttonsWidth - 8f, (TitleBarHeight - titleSize.Y) / 2f));
+                    ImGui.TextColored(Theme.TextDim, title);
+                }
+            }
+
+            ImGui.SetCursorScreenPos(origin + new Vector2(width - buttonsWidth, (TitleBarHeight - buttonHeight) / 2f));
+            if (ImGui.InvisibleButton("##fold", new Vector2(foldWidth, buttonHeight)))
+                ToggleFold();
+            var foldHovered = ImGui.IsItemHovered();
+            if (foldHovered)
+                ImGui.SetTooltip(Folded ? "Unfold the table" : "Fold down to your seat; the game keeps going");
+
+            ImGui.SetCursorScreenPos(origin + new Vector2(width - buttonsWidth + 6f, (TitleBarHeight - captionSize.Y) / 2f - (Folded ? 0f : 4f)));
+            ImGui.TextColored(foldHovered ? Theme.Text : Theme.TextFaint, Folded ? "^" : "_");
+
+            ImGui.SetCursorScreenPos(origin + new Vector2(width - closeWidth, (TitleBarHeight - buttonHeight) / 2f));
+            if (ImGui.InvisibleButton("##close", new Vector2(closeWidth, buttonHeight)))
+                IsOpen = false;
+            var closeHovered = ImGui.IsItemHovered();
+            ImGui.SetCursorScreenPos(origin + new Vector2(width - closeWidth + 6f, (TitleBarHeight - captionSize.Y) / 2f));
+            ImGui.TextColored(closeHovered ? Theme.Bad : Theme.TextFaint, "×");
+        }
+
+        ImGui.SetCursorScreenPos(origin + new Vector2(0f, TitleBarHeight + 8f));
+    }
+
+    private string Title()
+    {
+        if (!Session.InRoom)
+            return _floor.Title();
+        var game = GameCatalog.Find(Session.GameType)?.DisplayName ?? Session.GameType;
+        return $"{game} · {Session.RoomCode}";
+    }
+
+    private void ToggleFold()
+    {
+        // Folding lets the window shrink to the seat, which is the size ImGui would then
+        // remember; the size before folding is kept and put back on unfolding.
+        if (!Folded)
+            _unfoldedSize = ImGui.GetWindowSize();
+        else
+            _sizeToRestore = _unfoldedSize;
+
+        _plugin.Config.WindowFolded = !Folded;
+        _plugin.Config.Save();
+    }
+
+    // -- the table ---------------------------------------------------------------------------
+
+    private void DrawRoom()
+    {
+        DrawRoomHeader();
+
+        var feltHeight = ImGui.GetContentRegionAvail().Y - LogHeight - ImGui.GetStyle().ItemSpacing.Y;
+        if (Felt.Begin("##felt", feltHeight))
+        {
+            switch (Session.Phase)
+            {
+                case GamePhase.Lobby:
+                    Guarded("lobby", DrawLobbyFelt);
+                    break;
+                case GamePhase.Playing when Session.ActiveGame is { } game:
+                    Guarded(game.GameType + " felt", () => game.DrawFelt(Session));
+                    break;
+                case GamePhase.Playing:
+                    Theme.Marquee("Unknown game", Theme.Bad, $"This plugin version doesn't know '{Session.GameType}'. Update to play it.");
+                    break;
+                case GamePhase.GameOver:
+                    Guarded("game over", DrawGameOverFelt);
+                    break;
+            }
+        }
+        Felt.End();
+
+        DrawLog();
+    }
+
+    /// <summary>Which stage the table is at, what is being played and for whom.</summary>
+    private void DrawRoomHeader()
+    {
+        var game = GameCatalog.Find(Session.GameType);
+        var name = game?.DisplayName ?? Session.GameType;
+        var (word, description) = Session.Phase switch
+        {
+            GamePhase.Lobby => ("Lobby", "Share the code so friends can sit down or watch."),
+            GamePhase.Playing => ("At the table", Session.VenueName is { } venue ? $"{name} · {venue}" : name),
+            _ => ("Game over", Session.WinnerId is { } w ? $"{Session.NameOf(w)} takes the table." : "Nobody won."),
+        };
+
+        var right = Session.Phase == GamePhase.Lobby
+            ? $"{Session.Players.Count}/{game?.MaxPlayers ?? 6} seated"
+            : Session.IsSpectator ? "watching" : "";
+        var rightWidth = right.Length > 0 ? ImGui.CalcTextSize(right).X + 12f : 0f;
+
+        ImGui.AlignTextToFramePadding();
+        Theme.Displayed(Theme.Accent, word.ToUpperInvariant());
+        ImGui.SameLine(0f, 12f);
+        ImGui.TextColored(Theme.TextDim, Ui.Fit(description, ImGui.GetContentRegionAvail().X - rightWidth));
+        if (right.Length > 0)
+        {
+            ImGui.SameLine();
+            Ui.RightAlignedText(right, Theme.TextFaint);
+        }
+        ImGui.Dummy(new Vector2(0f, 2f));
+    }
+
+    /// <summary>The lobby on the felt: the code, big, and a plate for every seat, filled or waiting.</summary>
+    private void DrawLobbyFelt()
+    {
+        var game = GameCatalog.Find(Session.GameType);
+        var max = game?.MaxPlayers ?? 6;
+
+        ImGui.Dummy(new Vector2(0f, 4f));
+        Theme.Marquee(Session.RoomCode, Theme.Accent);
+
+        if (!Client.IsLocal)
+        {
+            var hint = "They enter it under Join a code, or find the table on the venue page.";
+            var copyWidth = ImGui.CalcTextSize("Copy").X + 16f;
+            Ui.CenterNext(copyWidth + 8f + ImGui.CalcTextSize(hint).X);
+            if (ImGui.SmallButton("Copy"))
+                ImGui.SetClipboardText(Session.RoomCode);
+            ImGui.SameLine(0f, 8f);
+            ImGui.TextColored(Theme.TextFaint, hint);
+        }
+
+        ImGui.Dummy(new Vector2(0f, 10f));
+
+        var isHost = Session.IsHost;
+        Felt.Plates(
+            Session,
+            tally: _ => ImGui.TextColored(Theme.TextFaint, "ready"),
+            nameLine: isHost ? RemoveBotControl : null,
+            emptySeats: Math.Max(0, max - Session.Players.Count),
+            seatBot: isHost ? () => Client.Send(new AddBot()) : null);
+    }
+
+    private void RemoveBotControl(PlayerPublic p)
+    {
+        if (!p.IsBot)
+            return;
+        ImGui.SameLine();
+        if (ImGui.SmallButton("remove"))
+            Client.Send(new RemoveBot(p.Id));
+        Ui.Tip("Send this bot away.");
+    }
+
+    private void DrawGameOverFelt()
+    {
+        var winner = Session.WinnerId is { } w ? Session.NameOf(w) : "Nobody";
+        ImGui.Dummy(new Vector2(0f, 4f));
+        Theme.Marquee($"{winner} wins", Theme.Accent, Session.WinnerId == Session.MyId ? "The table is yours." : "Well played, all.");
+        ImGui.Dummy(new Vector2(0f, 10f));
+        Felt.Plates(Session, Session.ActiveGame is { } game ? game.DrawSeatTally : null);
+    }
+
+    /// <summary>The log under the felt: what happened, newest at the bottom and brightest.</summary>
+    private void DrawLog()
+    {
+        var dl = ImGui.GetWindowDrawList();
+        var start = ImGui.GetCursorScreenPos();
+        var size = new Vector2(ImGui.GetContentRegionAvail().X, LogHeight);
+        dl.AddRectFilled(start, start + size, Theme.U32(Theme.Glass), Theme.PanelRounding);
+        dl.AddRect(start, start + size, Theme.U32(Theme.GlassEdge), Theme.PanelRounding, ImDrawFlags.RoundCornersAll, 1f);
+
+        ImGui.SetCursorScreenPos(start + new Vector2(8f, 4f));
+        if (ImGui.BeginChild("##log", size - new Vector2(16f, 8f), false, ImGuiWindowFlags.None))
+        {
+            var log = Session.Log;
+            for (var i = 0; i < log.Count; i++)
+            {
+                ImGui.PushStyleColor(ImGuiCol.Text, i == log.Count - 1 ? Theme.Text : Theme.TextFaint);
+                ImGui.TextWrapped(log[i]);
+                ImGui.PopStyleColor();
+            }
+            if (ImGui.GetScrollY() >= ImGui.GetScrollMaxY() - 2)
+                ImGui.SetScrollHereY(1f);
+        }
+        ImGui.EndChild();
+
+        ImGui.SetCursorScreenPos(start);
+        ImGui.Dummy(size);
     }
 
     private void LeaveRoom()
     {
         Client.Send(new LeaveRoom());
         Session.Reset();
+        Fx.Reset();
+        _floor.GoHome();
     }
 }

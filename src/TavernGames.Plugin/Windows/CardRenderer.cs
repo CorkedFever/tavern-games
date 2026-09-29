@@ -8,6 +8,8 @@ namespace TavernGames.Plugin.Windows;
 /// Draws playing cards on ImGui's draw list. Suit symbols aren't reliably present in
 /// the game's font, so the pips are built from circles, triangles and quads instead;
 /// only the rank is text. A code of <see cref="Card.HiddenCode"/> draws a card back.
+/// Given a deal or flip key that <see cref="Fx"/> has started, a hand's cards arrive one
+/// after another, or turn over from back to face.
 /// </summary>
 internal static class CardRenderer
 {
@@ -21,58 +23,81 @@ internal static class CardRenderer
     private static readonly Vector4 BackTrim = new(0.80f, 0.62f, 0.30f, 1f);
     private static readonly Vector4 Highlight = new(1f, 0.78f, 0.2f, 1f);
 
-    /// <summary>Draws one card from its wire code and advances the layout.</summary>
-    public static void Draw(string code, float width, bool highlight = false)
+    /// <summary>
+    /// Draws one card from its wire code and advances the layout. <paramref name="lift"/> and
+    /// <paramref name="alpha"/> are for a card still arriving; <paramref name="flip"/> runs 0
+    /// (face down) to 1 (face up) as a card turns over.
+    /// </summary>
+    public static void Draw(string code, float width, bool highlight = false, float alpha = 1f, float lift = 0f, float flip = 1f)
     {
         var dl = ImGui.GetWindowDrawList();
         var p = ImGui.GetCursorScreenPos();
         var size = new Vector2(width, width * Aspect);
         var rounding = width * 0.12f;
 
-        if (!Card.TryParse(code, out var card))
+        // A flip is a horizontal squash: the back until halfway, the face after.
+        var squash = MathF.Abs(MathF.Cos(flip * MathF.PI));
+        var drawWidth = MathF.Max(2f, width * squash);
+        var q = p + new Vector2((width - drawWidth) / 2f, -lift);
+        var drawSize = new Vector2(drawWidth, size.Y);
+
+        if (!Card.TryParse(code, out var card) || flip < 0.5f)
         {
-            DrawBack(dl, p, size, rounding);
+            DrawBack(dl, q, drawSize, rounding, alpha);
             ImGui.Dummy(size);
             return;
         }
 
-        dl.AddRectFilled(p, p + size, ImGui.GetColorU32(Face), rounding);
-        dl.AddRect(p, p + size, ImGui.GetColorU32(highlight ? Highlight : Border), rounding,
+        dl.AddRectFilled(q, q + drawSize, Col(Face, alpha), rounding);
+        dl.AddRect(q, q + drawSize, Col(highlight ? Highlight : Border, alpha), rounding,
             ImDrawFlags.RoundCornersAll, highlight ? 2.4f : 1.2f);
 
-        var ink = ImGui.GetColorU32(card.Suit is Suit.Hearts or Suit.Diamonds ? RedSuit : Black);
+        // Mid-turn the card is too narrow for its markings.
+        if (squash > 0.6f)
+        {
+            var ink = Col(card.Suit is Suit.Hearts or Suit.Diamonds ? RedSuit : Black, alpha);
 
-        // Rank in the corner, a small pip under it, and a large pip in the body.
-        dl.AddText(p + new Vector2(width * 0.10f, width * 0.04f), ink, RankLabel(card.Rank));
-        DrawSuit(dl, card.Suit, p + new Vector2(width * 0.50f, size.Y * 0.66f), width * 0.13f, ink);
+            // Rank in the corner, a large pip in the body.
+            dl.AddText(q + new Vector2(width * 0.10f, width * 0.04f), ink, RankLabel(card.Rank));
+            DrawSuit(dl, card.Suit, q + new Vector2(drawWidth * 0.50f, size.Y * 0.66f), width * 0.13f, ink);
+        }
 
         ImGui.Dummy(size);
     }
 
-    /// <summary>Draws a row of cards; hidden codes show as card backs.</summary>
-    public static void Hand(IReadOnlyList<string> codes, float width, float gap = 4f)
+    /// <summary>
+    /// Draws a row of cards; hidden codes show as card backs. With a <paramref name="deal"/> key
+    /// the cards arrive one after another; with a <paramref name="flip"/> key the cards from
+    /// <paramref name="flipFrom"/> on turn over.
+    /// </summary>
+    public static void Hand(IReadOnlyList<string> codes, float width, float gap = 4f, string? deal = null, string? flip = null, int flipFrom = 0)
     {
         for (var i = 0; i < codes.Count; i++)
         {
-            Draw(codes[i], width);
+            var arrived = deal is null ? 1f : Fx.DealProgress(deal, i);
+            var turned = flip is null || i < flipFrom ? 1f : Fx.FlipProgress(flip, i - flipFrom);
+            Draw(codes[i], width, alpha: 0.15f + 0.85f * arrived, lift: (1f - EaseOut(arrived)) * 16f, flip: turned);
             if (i < codes.Count - 1) ImGui.SameLine(0, gap);
         }
     }
 
     public static float HeightFor(float width) => width * Aspect;
 
-    private static void DrawBack(ImDrawListPtr dl, Vector2 p, Vector2 size, float rounding)
+    private static void DrawBack(ImDrawListPtr dl, Vector2 p, Vector2 size, float rounding, float alpha)
     {
-        dl.AddRectFilled(p, p + size, ImGui.GetColorU32(Back), rounding);
-        dl.AddRect(p, p + size, ImGui.GetColorU32(Border), rounding, ImDrawFlags.RoundCornersAll, 1.2f);
+        dl.AddRectFilled(p, p + size, Col(Back, alpha), rounding);
+        dl.AddRect(p, p + size, Col(Border, alpha), rounding, ImDrawFlags.RoundCornersAll, 1.2f);
+
+        if (size.X < 12f)
+            return;
 
         var inset = new Vector2(size.X * 0.14f, size.X * 0.14f);
-        dl.AddRect(p + inset, p + size - inset, ImGui.GetColorU32(BackTrim), rounding * 0.5f, ImDrawFlags.RoundCornersAll, 1f);
+        dl.AddRect(p + inset, p + size - inset, Col(BackTrim, alpha), rounding * 0.5f, ImDrawFlags.RoundCornersAll, 1f);
 
         var c = p + size * 0.5f;
         var d = size.X * 0.16f;
         dl.AddQuadFilled(c + new Vector2(0, -d), c + new Vector2(d, 0), c + new Vector2(0, d), c + new Vector2(-d, 0),
-            ImGui.GetColorU32(BackTrim));
+            Col(BackTrim, alpha));
     }
 
     /// <summary>Draws a suit pip centred on <paramref name="c"/>; <paramref name="r"/> is the lobe radius.</summary>
@@ -123,4 +148,8 @@ internal static class CardRenderer
         Rank.Jack => "J",
         _ => ((int)rank).ToString(),
     };
+
+    private static uint Col(Vector4 colour, float alpha) => ImGui.GetColorU32(colour with { W = colour.W * alpha });
+
+    private static float EaseOut(float k) => 1f - MathF.Pow(1f - k, 3f);
 }

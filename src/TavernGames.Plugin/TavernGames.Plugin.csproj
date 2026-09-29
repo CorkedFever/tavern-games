@@ -50,6 +50,16 @@
     <PackageReference Include="DalamudPackager" Version="15.0.0" />
   </ItemGroup>
 
+  <!-- The display face (VT323, SIL OFL) and the installer icon ship next to the DLL. -->
+  <ItemGroup>
+    <None Update="Fonts\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="images\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\TavernGames.Core\TavernGames.Core.csproj" />
   </ItemGroup>
