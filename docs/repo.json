@@ -3,7 +3,7 @@
     "Author": "CorkedFever",
     "Name": "Tavern Games",
     "InternalName": "TavernGames",
-    "AssemblyVersion": "0.1.1.0",
+    "AssemblyVersion": "0.1.2.0",
     "Description": "A collection of tavern games (Liar's Dice, Pig, Mia, Blackjack, Hold'em, Roulette and more). Create or join a room with a short code, fill seats with bots, and let onlookers spectate. Open with /tavern.",
     "Punchline": "Dice and bluffing games to play with other players in-game.",
     "ApplicableVersion": "any",
@@ -13,9 +13,9 @@
     "CanUnloadAsync": false,
     "LoadPriority": 0,
     "RepoUrl": "https://github.com/CorkedFever/tavern-games",
-    "DownloadLinkInstall": "https://github.com/CorkedFever/tavern-games/releases/download/v0.1.1/TavernGames.zip",
-    "DownloadLinkUpdate": "https://github.com/CorkedFever/tavern-games/releases/download/v0.1.1/TavernGames.zip",
-    "DownloadLinkTesting": "https://github.com/CorkedFever/tavern-games/releases/download/v0.1.1/TavernGames.zip",
+    "DownloadLinkInstall": "https://github.com/CorkedFever/tavern-games/releases/download/v0.1.2/TavernGames.zip",
+    "DownloadLinkUpdate": "https://github.com/CorkedFever/tavern-games/releases/download/v0.1.2/TavernGames.zip",
+    "DownloadLinkTesting": "https://github.com/CorkedFever/tavern-games/releases/download/v0.1.2/TavernGames.zip",
     "IsHide": false,
     "IsTestingExclusive": false,
     "DownloadCount": 0,
@@ -32,9 +32,9 @@
       "venue",
       "tavern"
     ],
-    "TestingAssemblyVersion": "0.1.1.0",
+    "TestingAssemblyVersion": "0.1.2.0",
     "TestingDalamudApiLevel": 15,
-    "LastUpdate": 1790739705,
+    "LastUpdate": 1790741053,
     "IconUrl": "https://raw.githubusercontent.com/CorkedFever/tavern-games/main/src/TavernGames.Plugin/images/icon.png"
   }
 ]
