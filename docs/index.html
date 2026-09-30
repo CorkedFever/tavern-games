@@ -98,10 +98,24 @@ kbd { font-family: var(--mono); font-size: 13px; background: #060A12; border: 1p
 .legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px 24px; margin-top: 18px; font-size: 14.5px; color: var(--dim); }
 .legend b { font-family: var(--display); font-weight: 400; font-size: 21px; letter-spacing: 2px; color: var(--text); display: block; }
 .legend b.a { color: var(--accent); } .legend b.g { color: var(--good); } .legend b.r { color: var(--bad); }
+.tb .how { display: inline-block; margin-top: 12px; font-family: var(--display); font-size: 18px; letter-spacing: 1px; }
+.rulebook { display: grid; gap: 10px; }
+details.rules { background: var(--panel); border: 1px solid var(--edge); border-radius: 6px; scroll-margin-top: 72px; }
+details.rules[open] { border-color: var(--accent); }
+details.rules summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 14px; padding: 12px 18px; }
+details.rules summary::-webkit-details-marker { display: none; }
+details.rules summary::before { content: "\203A"; font-family: var(--mono); color: var(--accent); display: inline-block; width: 10px; transition: transform 0.15s; }
+details.rules[open] summary::before { transform: rotate(90deg); }
+details.rules summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
+details.rules .game { font-family: var(--display); font-size: 28px; letter-spacing: 2px; line-height: 1; color: var(--accent); }
+details.rules .seats { font-family: var(--mono); font-size: 12.5px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.5px; }
+details.rules .body { padding: 0 18px 18px 42px; max-width: 74ch; min-width: 0; }
+details.rules h3 { font-family: var(--display); font-weight: 400; font-size: 21px; letter-spacing: 2px; color: var(--text); margin: 14px 0 2px; }
+details.rules p { margin: 0; color: var(--dim); font-size: 15px; }
 footer { border-top: 1px solid var(--seam); padding: 30px 0 40px; color: var(--faint); font-size: 13.5px; }
 footer .wrap { display: flex; gap: 8px 20px; flex-wrap: wrap; align-items: baseline; }
 footer .on { color: var(--good); font-family: var(--display); font-size: 17px; letter-spacing: 1px; }
-@media (max-width: 620px) { .wrap, .bar { padding-left: 16px; padding-right: 16px; } .bar nav { margin-left: 0; width: 100%; gap: 18px; } .hero { padding: 40px 0; gap: 28px; } .hero .mark { width: 200px; height: auto; } }
+@media (max-width: 620px) { .wrap, .bar { padding-left: 16px; padding-right: 16px; } .bar nav { margin-left: 0; width: 100%; gap: 18px; } .hero { padding: 40px 0; gap: 28px; } .hero .mark { width: 200px; height: auto; } details.rules .body { padding-left: 18px; } }
 </style>
 </head>
 <body>
@@ -124,6 +138,7 @@ footer .on { color: var(--good); font-family: var(--display); font-size: 17px; l
     <span class="name">TAVERN GAMES</span>
     <nav aria-label="Sections">
       <a href="#games">The games</a>
+      <a href="#rules">How to play</a>
       <a href="#install">Install</a>
       <a href="#window">The window</a>
       <a href="#others">With others</a>
@@ -155,19 +170,148 @@ footer .on { color: var(--good); font-family: var(--display); font-size: 17px; l
     <h2>THE GAMES</h2>
     <div class="tables">
       <div class="tb"><div class="no">TABLE 1</div><h3>Liar's Dice</h3><div class="seats">2 to 6 seats</div>
-        <p>Everyone rolls under a cup. Raise the bid, or call liar and every cup comes off. Lose a die when you're wrong; the last one with dice wins.</p></div>
+        <p>Everyone rolls under a cup. Raise the bid, or call liar and every cup comes off. Lose a die when you're wrong; the last one with dice wins.</p>
+        <a class="how" href="#rules-liarsdice">HOW TO PLAY &#8250;</a></div>
       <div class="tb"><div class="no">TABLE 2</div><h3>Pig</h3><div class="seats">2 to 6 seats</div>
-        <p>Roll one die as often as you dare and bank the pot when your nerve goes. A one loses the lot. First to the target wins.</p></div>
-      <div class="tb"><div class="no">TABLE 3</div><h3>Mia</h3><div class="seats">2 to 6 seats</div>
-        <p>Two dice under a cup only you can see, and a number you announce that has to beat the last one. Truthfully or otherwise. Twenty-one is Mia and beats everything.</p></div>
-      <div class="tb"><div class="no">TABLE 4</div><h3>Blackjack</h3><div class="seats">1 to 5 seats and the house</div>
-        <p>Beat the dealer to twenty-one. Hit, stand or double down; the dealer draws to seventeen. Biggest stack after the last round wins.</p></div>
-      <div class="tb"><div class="no">TABLE 5</div><h3>Texas Hold'em</h3><div class="seats">2 to 6 seats</div>
-        <p>A no-limit sit-and-go. Two cards each, five on the board, blinds that climb, side pots that pay only what each seat covered. Play until one seat holds every chip.</p></div>
+        <p>Roll one die as often as you dare and bank the pot when your nerve goes. A one loses the lot. First to the target wins.</p>
+        <a class="how" href="#rules-pig">HOW TO PLAY &#8250;</a></div>
+      <div class="tb"><div class="no">TABLE 3</div><h3>Blackjack</h3><div class="seats">1 to 5 seats and the house</div>
+        <p>Beat the dealer to twenty-one. Hit, stand or double down; the dealer draws to seventeen. Biggest stack after the last round wins.</p>
+        <a class="how" href="#rules-blackjack">HOW TO PLAY &#8250;</a></div>
+      <div class="tb"><div class="no">TABLE 4</div><h3>Texas Hold'em</h3><div class="seats">2 to 6 seats</div>
+        <p>A no-limit sit-and-go. Two cards each, five on the board, blinds that climb, side pots that pay only what each seat covered. Play until one seat holds every chip.</p>
+        <a class="how" href="#rules-holdem">HOW TO PLAY &#8250;</a></div>
+      <div class="tb"><div class="no">TABLE 5</div><h3>Mia</h3><div class="seats">2 to 6 seats</div>
+        <p>Two dice under a cup only you can see, and a number you announce that has to beat the last one. Truthfully or otherwise. Twenty-one is Mia and beats everything.</p>
+        <a class="how" href="#rules-mia">HOW TO PLAY &#8250;</a></div>
       <div class="tb"><div class="no">TABLE 6</div><h3>Roulette</h3><div class="seats">1 to 6 seats and the house</div>
-        <p>Chips on the layout, the wheel turns, the ball lands where the server said it would. Straight numbers pay thirty-five to one; a zero takes every outside bet.</p></div>
+        <p>Chips on the layout, the wheel turns, the ball lands where the server said it would. Straight numbers pay thirty-five to one; a zero takes every outside bet.</p>
+        <a class="how" href="#rules-roulette">HOW TO PLAY &#8250;</a></div>
       <div class="tb"><div class="no">TABLE 7</div><h3>Ship, Captain and Crew</h3><div class="seats">2 to 6 seats</div>
-        <p>Five dice, three throws. A six, then a five, then a four, in that order, and the other two dice are your cargo. Best cargo takes the round.</p></div>
+        <p>Five dice, three throws. A six, then a five, then a four, in that order, and the other two dice are your cargo. Best cargo takes the round.</p>
+        <a class="how" href="#rules-shipcaptaincrew">HOW TO PLAY &#8250;</a></div>
+    </div>
+  </section>
+
+  <section id="rules">
+    <h2>HOW TO PLAY</h2>
+    <p class="lede">The same rules the plugin shows on each game's screen, and behind the Rules button at the table.</p>
+    <div class="rulebook">
+    <!-- rules:start: generated from each game's rules by SiteRulesTests. Run the Core tests with TAVERN_UPDATE_SITE=1 to refresh. -->
+    <details class="rules" id="rules-liarsdice">
+      <summary><span class="game">Liar&#39;s Dice</span><span class="seats">2 to 6 players</span></summary>
+      <div class="body">
+        <h3>The aim</h3>
+        <p>Be the last player with dice left. Every call you lose costs you a die.</p>
+        <h3>The roll</h3>
+        <p>Everyone starts with the same number of dice. Each round, all dice are rolled in secret and you see only yours.</p>
+        <h3>Bidding</h3>
+        <p>A bid says the whole table holds at least so many of one face, like 4 fives. Everyone&#39;s dice count, yours too. Ones are not wild here, so each die counts only as its own face.</p>
+        <h3>Your turn</h3>
+        <p>Turns go round the table, and on yours you bid or call liar. The opening bid can be any count and face, as there is nothing to call yet. Each later bid needs more dice of any face, or the same count of a higher face. Set the count with - and +, press the die with your face, then the key that reads your bid, like Bid 4 fives.</p>
+        <h3>Calling liar</h3>
+        <p>Anyone still in except the bidder can press Call liar! at any time, even out of turn. Every cup comes off and that face is counted. If there are at least as many as bid, the caller loses a die. If fewer, the bidder loses one.</p>
+        <h3>Winning</h3>
+        <p>After a call, everyone rolls again and the loser opens the next round. Lose your last die and you are out, so the next player still in opens instead. The last player with dice wins.</p>
+      </div>
+    </details>
+    <details class="rules" id="rules-pig">
+      <summary><span class="game">Pig</span><span class="seats">2 to 6 players</span></summary>
+      <div class="body">
+        <h3>The aim</h3>
+        <p>Be the first to bank enough points to reach the target score. The target is 100 unless the host picked another.</p>
+        <h3>Your turn</h3>
+        <p>Play goes around the table in seat order, starting with the first seat. On your turn, press Roll to throw one die. A 2 to 6 adds that many points to the total riding on your turn. You can keep rolling as long as you dare.</p>
+        <h3>Rolling a one</h3>
+        <p>Roll a 1 and you bust. Everything riding this turn is lost and the die passes to the next player. Points you banked on earlier turns are safe.</p>
+        <h3>Holding</h3>
+        <p>Press Hold to add what is riding to your score and pass the die. The key shows the amount, like Hold 12. You have to roll at least once before you can hold.</p>
+        <h3>Winning</h3>
+        <p>You win the moment you hold and your score reaches or passes the target. The game ends right there, so nobody gets a last turn to catch up. Points riding do not count until you hold. If everyone else leaves, the last player left wins.</p>
+      </div>
+    </details>
+    <details class="rules" id="rules-blackjack">
+      <summary><span class="game">Blackjack</span><span class="seats">1 to 5 players</span></summary>
+      <div class="body">
+        <h3>The aim</h3>
+        <p>Beat the dealer without going over 21, and finish with the most chips.</p>
+        <h3>Card values</h3>
+        <p>Number cards count face value, and face cards count 10. An ace counts 11, or 1 if 11 would put you over 21. A soft total has an ace counting 11. An ace and a 10-value card as your first two cards is a blackjack.</p>
+        <h3>Betting</h3>
+        <p>Everyone bets at once. Set an amount with the slider or the Min, Half and All in buttons, then press Bet. Then everyone gets two cards face up, and the dealer one up and one down.</p>
+        <h3>Your turn</h3>
+        <p>Players go in seat order. Press Hit for a card or Stand to stop, but over 21 is a bust and loses your bet. On your first two cards, press Double to double your bet and take exactly one more card. This table has no splitting or insurance.</p>
+        <h3>The dealer</h3>
+        <p>The dealer then flips the face-down card and draws to 17 or more. Beat the dealer&#39;s total, or stay in while the dealer busts, for even money. A tie is a push and returns your bet, and a blackjack pays 3 to 2, rounded down. A dealer blackjack ends the round at once, beating all but another blackjack, which ties.</p>
+        <h3>Winning</h3>
+        <p>The game ends after the last round, or once everyone is out. You&#39;re out when you can&#39;t cover the minimum bet. A tie for most chips goes to the earlier seat.</p>
+      </div>
+    </details>
+    <details class="rules" id="rules-holdem">
+      <summary><span class="game">Texas Hold&#39;em</span><span class="seats">2 to 6 players</span></summary>
+      <div class="body">
+        <h3>The aim</h3>
+        <p>Everyone starts with the same chips, and running out puts you out. Win pots with the best hand or by making the others fold, and be the last player with chips left.</p>
+        <h3>The deal</h3>
+        <p>The dealer button, marked D, moves one seat each hand, and the two players on its left post the small and big blind, forced bets that can double every few hands. With two players, the button posts the small one. If you can&#39;t cover a blind, you post what you have and are all in.</p>
+        <h3>Betting</h3>
+        <p>You get two private cards, then five shared ones: three on the flop, one on the turn, one on the river. Betting starts left of the big blind before the flop, and left of the button after each of those. A round ends when everyone still in has had a turn and matched the bet.</p>
+        <h3>Your turn</h3>
+        <p>Press Fold to give up, Check when there&#39;s nothing to call, or Call to match the bet. To bet or raise, set the slider or press Min, Half, Pot or All in, then press Bet or Raise to. A raise must add at least the last full bet or raise that round, and at least the big blind.</p>
+        <h3>All in</h3>
+        <p>You may go all in for less than a full raise, but anyone who has acted since the last full bet or raise can then only call or fold. When everyone else still in is all in, you can only call or fold. All in, you act no more and only win what you matched from each player: bigger bets make a side pot, and a bet nobody matched goes back. If nobody can bet any more, the hands turn up and the board is dealt out.</p>
+        <h3>Showdown</h3>
+        <p>If everyone else folds, you take the pot without showing. Otherwise the best five of your seven cards win: straight flush, four of a kind, full house, flush, straight, three of a kind, two pair, pair, then high card. Higher cards break ties, suits never do, and an ace can be low in a five high straight. Equal hands split the pot, and any odd chips go one each to the winners nearest the button&#39;s left.</p>
+      </div>
+    </details>
+    <details class="rules" id="rules-mia">
+      <summary><span class="game">Mia</span><span class="seats">2 to 6 players</span></summary>
+      <div class="body">
+        <h3>The aim</h3>
+        <p>Everyone starts with equal lives. Lose them all and you&#39;re out. The last player with lives left wins.</p>
+        <h3>Reading the dice</h3>
+        <p>Two dice read as one number, higher die first, so a 5 and a 2 is 52. Mixed rolls run 31 up to 65, then doubles 11 up to 66. A 2 and a 1 is Mia, and nothing beats it.</p>
+        <h3>Your turn</h3>
+        <p>Your dice roll automatically under your cup, and only you see them. Press the Truth key to announce them, or any value in the list to bluff. A round opens with any announcement, and later ones must beat the last value believed, even if that means bluffing. This table doesn&#39;t let you pass the cup on unseen.</p>
+        <h3>Answering</h3>
+        <p>The next player answers. Press Believe it to take the cup, roll fresh and announce higher. Press Call liar! to lift the cup. If the dice match or beat the claim, the caller loses a life, and if not, the announcer does.</p>
+        <h3>Facing Mia</h3>
+        <p>You can&#39;t believe a Mia. If you call it, whoever was wrong loses two lives. Press Concede a life to lose just one, and the dice stay hidden.</p>
+        <h3>New rounds</h3>
+        <p>Every lost life ends the round. The loser starts the next with nothing to beat, or the player after them if they&#39;re out. If the cup holder or the answering player leaves, the round restarts and nobody loses a life.</p>
+      </div>
+    </details>
+    <details class="rules" id="rules-roulette">
+      <summary><span class="game">Roulette</span><span class="seats">1 to 6 players</span></summary>
+      <div class="body">
+        <h3>The aim</h3>
+        <p>You bet against the house, not each other, and everyone plays the same wheel. Whoever has the most chips after the last spin wins.</p>
+        <h3>Placing bets</h3>
+        <p>Everyone bets at once. Pick a chip worth one, two, five, ten or twenty times the minimum bet, then click a spot on the felt to bet it. Click again to add more, or press Clear bets to take it all back. This table doesn&#39;t take splits, streets or corners.</p>
+        <h3>Payouts</h3>
+        <p>A single number, 0 included, pays 35 to 1. A dozen pays 2 to 1, and so does a column, the 2:1 spot that bets on its whole row. Red, black, odd, even, 1-18 and 19-36 pay 1 to 1. When the ball lands on 0, only a bet on 0 wins.</p>
+        <h3>The spin</h3>
+        <p>Press Done betting to lock your bets in. To skip a spin, leave the felt empty and press Sit this one out. The wheel turns once everyone still in the game is done. Then winning bets are paid, their stakes come back too, and the next spin opens on an empty felt.</p>
+        <h3>Winning</h3>
+        <p>Before each spin, anyone with fewer chips than the minimum bet is out for the rest of the game. The game ends after the last spin, or sooner if everyone is out. Most chips wins, and a tie goes to the earlier seat.</p>
+      </div>
+    </details>
+    <details class="rules" id="rules-shipcaptaincrew">
+      <summary><span class="game">Ship, Captain &amp; Crew</span><span class="seats">2 to 6 players</span></summary>
+      <div class="body">
+        <h3>The aim</h3>
+        <p>Get a ship, a captain and a crew aboard, and your other two dice become your cargo. The highest cargo wins the round, and enough rounds win you the game.</p>
+        <h3>Your turn</h3>
+        <p>Players take turns in seat order, each with five dice and three rolls. Press Roll to throw all five, then press Roll again to throw every die not set aside. Your third roll always ends your turn.</p>
+        <h3>Ship, captain, crew</h3>
+        <p>A 6 is the ship, a 5 the captain and a 4 the crew. They must come aboard in that order, and the game sets each aside as it lands. All three can come in one throw, but a 5 or 4 that comes too early is thrown again.</p>
+        <h3>The cargo</h3>
+        <p>Once the crew is aboard, your other two dice add up to your cargo. Press Hold to keep it and end your turn, or press Throw the cargo to throw both again and take whatever they show. This table doesn&#39;t let you keep one cargo die and throw the other. No crew after three rolls scores nothing.</p>
+        <h3>Winning</h3>
+        <p>When everyone has thrown, the highest cargo wins the round. If the top cargo is tied, only those players throw again in a roll-off. If nobody gets a crew aboard, even in a roll-off, everyone throws the round again. First to the set number of rounds wins the game.</p>
+      </div>
+    </details>
+    <!-- rules:end -->
     </div>
   </section>
 
@@ -244,6 +388,16 @@ footer .on { color: var(--good); font-family: var(--display); font-size: 17px; l
 </footer>
 
 <script>
+  function openRules(id) {
+    var el = id && document.getElementById(id);
+    if (el && el.tagName === 'DETAILS') el.open = true;
+  }
+  window.addEventListener('hashchange', function () { openRules(location.hash.slice(1)); });
+  openRules(location.hash.slice(1));
+  document.querySelectorAll('a[href^="#rules-"]').forEach(function (a) {
+    a.addEventListener('click', function () { openRules(a.getAttribute('href').slice(1)); });
+  });
+
   document.querySelectorAll('button[data-copy]').forEach(function (button) {
     button.addEventListener('click', function () {
       var text = button.getAttribute('data-copy');
