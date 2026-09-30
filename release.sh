@@ -107,10 +107,12 @@ git commit -q -m "Release $VERSION"
 git tag -a "$TAG" -m "Tavern Games $VERSION"
 
 say "publishing"
+# The tag goes up before the release is created: given a tag GitHub doesn't have yet,
+# gh would mint its own on the default branch's head, one commit behind the bump.
+git push -q origin main "$TAG"
 STAGED="$(mktemp -d)"
 cp "$ZIP" "$STAGED/TavernGames.zip"
-gh release create "$TAG" "$STAGED/TavernGames.zip" --repo "$REPO" --title "Tavern Games $VERSION" --notes-file "$NOTES"
-git push -q origin main "$TAG"
+gh release create "$TAG" "$STAGED/TavernGames.zip" --repo "$REPO" --title "Tavern Games $VERSION" --notes-file "$NOTES" --verify-tag
 rm -rf "$STAGED"
 
 say "asking GitHub Pages to rebuild"
