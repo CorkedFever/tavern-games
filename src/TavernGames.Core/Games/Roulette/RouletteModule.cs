@@ -43,13 +43,14 @@ public sealed class RouletteModule : IGameModule
         Type: Type,
         DisplayName: "Roulette",
         Blurb: "Chips on the layout, the wheel spins, the ball decides. Most chips after the last spin wins.",
+        Rules: RouletteRules.Sections,
         MinPlayers: RouletteGame.MinPlayers,
         MaxPlayers: RouletteGame.MaxPlayers,
         Options:
         [
-            new GameOption(ChipsKey, "Starting chips", 100, 5000, 500),
-            new GameOption(RoundsKey, "Spins", 3, 30, 10),
-            new GameOption(MinBetKey, "Minimum bet", 1, 100, 5),
+            new GameOption(ChipsKey, "Starting chips", 100, 5000, 500, "How many chips each player starts with. The default is 500."),
+            new GameOption(RoundsKey, "Spins", 3, 30, 10, "How many spins the game lasts. The default is 10."),
+            new GameOption(MinBetKey, "Minimum bet", 1, 100, 5, "The smallest bet you can place, which also sets the chip sizes, and a player with fewer chips than this before a spin is out. The default is 5."),
         ],
         Messages:
         [

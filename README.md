@@ -62,6 +62,11 @@ Back that file up and you've backed up everything.
    records, and an `IGameModule` that turns moves into `Emit`s (`ToAll`, `ToPlayer`,
    `Pause`). Give it a static `GameDescriptor` (name, player counts, room options, and
    its message types with namespaced wire names like `mygame.move`).
+   The descriptor also carries the game's **How to play**: a `<Name>Rules.cs` beside the
+   engine with a few `RulesSection`s, the first headed "The aim", describing what the
+   engine does rather than the game as played elsewhere, and a line of `Help` on every
+   option. The plugin shows them on the game's screen and in the Rules popup at the table,
+   and a platform test fails if a game ships without them.
 2. **Register it** by adding the descriptor to `GameCatalog.Games`. The room, the
    serializer and the lobby's game picker and option sliders pick it up from there.
 3. **Plugin view** in `src/TavernGames.Plugin/Games/`: an `IClientGame`, added to the
@@ -187,6 +192,7 @@ what it covered, and a split that does not divide evenly gives the odd chips to 
 seats nearest the button's left. A seat that walks out mid-hand folds on the spot and
 leaves behind only what somebody had already matched. A seat with nothing left after a
 hand is out. Only the hands that reach a showdown are ever shown.
+
 **Mia** (2-6 players). Roll two dice under a cup only you can see, then announce a value
 to the table. The higher die reads as the tens, so a 5 and a 2 is "52"; the mixed rolls
 rank 31 up to 65, then come the doubles, and 21 is Mia, which beats everything. The
@@ -195,7 +201,6 @@ truthfully or otherwise. The next player either believes you, takes the cup and 
 beat what they just accepted, or calls liar: your dice come out, and whoever was wrong
 loses a life. A Mia costs two lives, and since nothing beats it the player facing one
 may concede a single life instead of calling. Last player with lives wins.
-
 
 **Roulette** (1-6 players against the house). European, single zero. Each spin everyone puts
 chips on the layout, straight numbers or the outside bets (red or black, odd or even, low or

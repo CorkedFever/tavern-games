@@ -13,9 +13,10 @@ public sealed class LiarsDiceModule : IGameModule
         Type: Type,
         DisplayName: "Liar's Dice",
         Blurb: "Roll in secret, bid on the whole table's dice, and call out the liar.",
+        Rules: LiarsDiceRules.Sections,
         MinPlayers: LiarsDiceGame.MinPlayers,
         MaxPlayers: LiarsDiceGame.MaxPlayers,
-        Options: [new GameOption(StartingDiceKey, "Dice per player", 1, 6, LiarsDiceGame.DefaultStartingDice)],
+        Options: [new GameOption(StartingDiceKey, "Dice per player", 1, 6, LiarsDiceGame.DefaultStartingDice, "How many dice each player starts with, from 1 to 6. The default is 5.")],
         Messages:
         [
             (typeof(PlaceBid), "liarsdice.placeBid"),

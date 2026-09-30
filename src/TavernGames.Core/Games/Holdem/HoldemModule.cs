@@ -241,13 +241,14 @@ public sealed class HoldemModule : IGameModule
         Type: Type,
         DisplayName: "Texas Hold'em",
         Blurb: "No-limit hold'em, played down to one winner. Two cards each and five on the board.",
+        Rules: HoldemRules.Sections,
         MinPlayers: HoldemGame.MinPlayers,
         MaxPlayers: HoldemGame.MaxPlayers,
         Options:
         [
-            new GameOption(ChipsKey, "Starting chips", 500, 10000, 1000),
-            new GameOption(SmallBlindKey, "Small blind", 5, 100, 10),
-            new GameOption(BlindsUpKey, "Blinds up every (0 = never)", 0, 20, 8),
+            new GameOption(ChipsKey, "Starting chips", 500, 10000, 1000, "How many chips each player starts with. The default is 1000."),
+            new GameOption(SmallBlindKey, "Small blind", 5, 100, 10, "The small blind for the first hands, and the big blind is always twice the small blind. The default is 10."),
+            new GameOption(BlindsUpKey, "Blinds up every (0 = never)", 0, 20, 8, "How many hands are played before the blinds double, and 0 means they never go up. The default is 8."),
         ],
         Messages:
         [

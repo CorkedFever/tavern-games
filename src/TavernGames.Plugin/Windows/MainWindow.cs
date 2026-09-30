@@ -349,17 +349,31 @@ public sealed class MainWindow : Window
         var right = Session.Phase == GamePhase.Lobby
             ? $"{Session.Players.Count}/{game?.MaxPlayers ?? 6} seated"
             : Session.IsSpectator ? "watching" : "";
-        var rightWidth = right.Length > 0 ? ImGui.CalcTextSize(right).X + 12f : 0f;
+        var spacing = ImGui.GetStyle().ItemSpacing.X;
+        var rulesWidth = game is null ? 0f : ImGui.CalcTextSize("Rules").X + ImGui.GetStyle().FramePadding.X * 2f;
+        var rightWidth = (right.Length > 0 ? ImGui.CalcTextSize(right).X + spacing : 0f) + (rulesWidth > 0f ? rulesWidth + spacing : 0f) + 12f;
 
         ImGui.AlignTextToFramePadding();
         Theme.Displayed(Theme.Accent, word.ToUpperInvariant());
         ImGui.SameLine(0f, 12f);
         ImGui.TextColored(Theme.TextDim, Ui.Fit(description, ImGui.GetContentRegionAvail().X - rightWidth));
+
+        ImGui.SameLine();
+        Ui.RightAlign(rightWidth - 12f);
         if (right.Length > 0)
         {
+            ImGui.TextColored(Theme.TextFaint, right);
             ImGui.SameLine();
-            Ui.RightAlignedText(right, Theme.TextFaint);
         }
+
+        if (game is not null)
+        {
+            if (ImGui.SmallButton("Rules"))
+                RulesPanel.Open(game);
+            Ui.Tip($"How to play {game.DisplayName}.");
+        }
+        RulesPanel.DrawPopup();
+
         ImGui.Dummy(new Vector2(0f, 2f));
     }
 

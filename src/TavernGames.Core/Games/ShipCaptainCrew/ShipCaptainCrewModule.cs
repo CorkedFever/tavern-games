@@ -35,9 +35,10 @@ public sealed class ShipCaptainCrewModule : IGameModule
         Type: Type,
         DisplayName: "Ship, Captain & Crew",
         Blurb: "Five dice, three rolls. A ship, a captain and a crew, in that order, and the last two dice are your cargo. Best cargo takes the round.",
+        Rules: ShipCaptainCrewRules.Sections,
         MinPlayers: ShipCaptainCrewGame.MinPlayers,
         MaxPlayers: ShipCaptainCrewGame.MaxPlayers,
-        Options: [new GameOption(RoundsKey, "Rounds to win", 1, 5, 3)],
+        Options: [new GameOption(RoundsKey, "Rounds to win", 1, 5, 3, "How many rounds you must win to take the game. The default is 3.")],
         Messages:
         [
             (typeof(SccRoll), "shipcaptaincrew.roll"),

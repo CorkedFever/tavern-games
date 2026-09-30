@@ -13,9 +13,10 @@ public sealed class MiaModule : IGameModule
         Type: Type,
         DisplayName: "Mia",
         Blurb: "Roll two dice under the cup and announce something higher than the last player. Lie if you have to.",
+        Rules: MiaRules.Sections,
         MinPlayers: MiaGame.MinPlayers,
         MaxPlayers: MiaGame.MaxPlayers,
-        Options: [new GameOption(LivesKey, "Lives per player", 1, 6, MiaGame.DefaultLives)],
+        Options: [new GameOption(LivesKey, "Lives per player", 1, 6, MiaGame.DefaultLives, "How many lives each player starts with, from 1 to 6. The default is 3.")],
         Messages:
         [
             (typeof(MiaAnnounce), "mia.announce"),

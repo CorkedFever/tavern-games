@@ -8,18 +8,27 @@ using TavernGames.Core.Games.ShipCaptainCrew;
 
 namespace TavernGames.Core.Platform;
 
-/// <summary>A host-tunable integer setting a game exposes at room creation (rendered as a slider).</summary>
-public sealed record GameOption(string Key, string Label, int Min, int Max, int Default);
+/// <summary>
+/// A host-tunable integer setting a game exposes at room creation (rendered as a slider).
+/// <paramref name="Help"/> is one plain sentence on what it changes, shown as the slider's tooltip.
+/// </summary>
+public sealed record GameOption(string Key, string Label, int Min, int Max, int Default, string Help = "");
+
+/// <summary>One part of a game's "How to play": a short heading and a few plain sentences.</summary>
+public sealed record RulesSection(string Heading, string Text);
 
 /// <summary>
-/// Everything the platform needs to know about a game: how to list it, which wire
-/// messages it adds, and how to build its module. Adding a game means writing a
-/// module and adding its descriptor to <see cref="GameCatalog.Games"/>.
+/// Everything the platform needs to know about a game: how to list it, how to explain it,
+/// which wire messages it adds, and how to build its module. Adding a game means writing a
+/// module, its rules, and adding its descriptor to <see cref="GameCatalog.Games"/>.
+/// <paramref name="Rules"/> is the "How to play" the plugin shows, in playing order, and must
+/// describe what the engine does rather than the game as played elsewhere.
 /// </summary>
 public sealed record GameDescriptor(
     string Type,
     string DisplayName,
     string Blurb,
+    IReadOnlyList<RulesSection> Rules,
     int MinPlayers,
     int MaxPlayers,
     IReadOnlyList<GameOption> Options,

@@ -7,9 +7,9 @@ using TavernGames.Plugin.Game;
 namespace TavernGames.Plugin.Windows;
 
 /// <summary>
-/// A game's own screen on the floor: what it is, the rules the host can set, and the two ways
-/// to play it. Against bots needs nothing and starts at once; opening a table needs a server
-/// and gets a code for friends, or a venue to host it for.
+/// A game's own screen on the floor: what it is, how to play it, the settings the host can
+/// choose, and the two ways to play it. Against bots needs nothing and starts at once; opening
+/// a table needs a server and gets a code for friends, or a venue to host it for.
 /// </summary>
 internal sealed class GameScreen(Plugin plugin, Action home)
 {
@@ -17,6 +17,9 @@ internal sealed class GameScreen(Plugin plugin, Action home)
     private string? _hostVenueId;
     private float _turnDelaySec = 1.5f;
     private int _bots = 3;
+
+    /// <summary>Whether "How to play" is open, per game, for this session. Unset means open for a game never played.</summary>
+    private readonly Dictionary<string, bool> _rulesOpen = new();
 
     public GameDescriptor Game => _game;
 
@@ -46,7 +49,9 @@ internal sealed class GameScreen(Plugin plugin, Action home)
         ImGui.TextWrapped(game.Blurb);
         ImGui.PopStyleColor();
 
-        Theme.Heading("Table rules");
+        DrawHowToPlay(game);
+
+        Theme.Heading("Table settings");
         foreach (var option in game.Options)
         {
             var key = $"{game.Type}.{option.Key}";
@@ -55,6 +60,8 @@ internal sealed class GameScreen(Plugin plugin, Action home)
             ImGui.SetNextItemWidth(220f);
             if (ImGui.SliderInt($"{option.Label}##{key}", ref value, option.Min, option.Max))
                 plugin.Config.GameOptions[key] = value;
+            if (option.Help.Length > 0)
+                Ui.Tip(option.Help);
         }
 
         ImGui.SetNextItemWidth(220f);
@@ -94,6 +101,33 @@ internal sealed class GameScreen(Plugin plugin, Action home)
         Ui.Hint(online
             ? "A table gets a 4-letter code. Friends enter it under Join a code; staff can host it for a venue so members find it on the venue page."
             : "Playing against bots needs no server. Opening a table does: it gets a 4-letter code for friends, and staff can host it for a venue.");
+    }
+
+    /// <summary>
+    /// The rules, behind a toggle. Open the first time you look at a game you have never
+    /// finished, since that is when you need them; closed for the games you know.
+    /// </summary>
+    private void DrawHowToPlay(GameDescriptor game)
+    {
+        if (!_rulesOpen.TryGetValue(game.Type, out var open))
+            open = plugin.Config.LocalPlayed.GetValueOrDefault(game.Type) == 0;
+
+        ImGui.Dummy(new Vector2(0f, 2f));
+        using (Theme.PushDisplay())
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, open ? Theme.Accent : Theme.TextDim);
+            if (ImGui.SmallButton(open ? "HIDE HOW TO PLAY" : "HOW TO PLAY"))
+                open = !open;
+            ImGui.PopStyleColor();
+        }
+        Ui.Tip(open ? "Put the rules away." : $"The rules of {game.DisplayName}, as this table plays them.");
+        _rulesOpen[game.Type] = open;
+
+        if (!open)
+            return;
+
+        ImGui.Dummy(new Vector2(0f, 2f));
+        Theme.Panel($"rules{game.Type}", () => RulesPanel.Draw(game, ImGui.GetContentRegionAvail().X - 10f));
     }
 
     /// <summary>Staff and owners can open the table on behalf of one of their venues.</summary>

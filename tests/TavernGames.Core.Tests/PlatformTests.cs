@@ -44,6 +44,31 @@ public class PlatformTests
     }
 
     [Fact]
+    public void EveryGame_ExplainsItself_AndEverySetting()
+    {
+        foreach (var game in GameCatalog.Games)
+        {
+            Assert.True(game.Rules.Count >= 3, $"{game.Type} needs at least three rules sections");
+            Assert.Equal("The aim", game.Rules[0].Heading);
+            Assert.Equal(game.Rules.Count, game.Rules.Select(r => r.Heading).Distinct().Count());
+
+            foreach (var section in game.Rules)
+            {
+                Assert.False(string.IsNullOrWhiteSpace(section.Heading), $"{game.Type} has a section with no heading");
+                Assert.False(string.IsNullOrWhiteSpace(section.Text), $"{game.Type}: '{section.Heading}' is empty");
+                Assert.True(section.Heading.Split(' ').Length <= 3, $"{game.Type}: '{section.Heading}' is too long for a heading");
+                // Drawn as plain wrapped text: no markdown, and no characters the game's font lacks.
+                Assert.DoesNotContain("*", section.Text);
+                Assert.DoesNotContain("`", section.Text);
+                Assert.DoesNotContain("—", section.Text); // an em dash
+            }
+
+            foreach (var option in game.Options)
+                Assert.False(string.IsNullOrWhiteSpace(option.Help), $"{game.Type}.{option.Key} has no help text");
+        }
+    }
+
+    [Fact]
     public void Options_FallBackToDefaults_AndClampToRange()
     {
         var pig = GameCatalog.Find("pig")!;

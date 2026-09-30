@@ -46,9 +46,10 @@ public sealed class PigModule : IGameModule
         Type: Type,
         DisplayName: "Pig",
         Blurb: "Roll as long as you dare and bank the total. Roll a 1 and lose it all.",
+        Rules: PigRules.Sections,
         MinPlayers: PigGame.MinPlayers,
         MaxPlayers: PigGame.MaxPlayers,
-        Options: [new GameOption(TargetKey, "Score to win", 20, 200, PigGame.DefaultTargetScore)],
+        Options: [new GameOption(TargetKey, "Score to win", 20, 200, PigGame.DefaultTargetScore, "The score you need to bank to win, from 20 to 200. The default is 100.")],
         Messages:
         [
             (typeof(PigRoll), "pig.roll"),

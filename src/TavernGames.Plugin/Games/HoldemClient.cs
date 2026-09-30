@@ -406,7 +406,8 @@ public sealed class HoldemClient : IClientGame
 
         if (ImGui.SmallButton("Min")) _raiseTo = min;
         ImGui.SameLine();
-        if (ImGui.SmallButton("½ pot")) _raiseTo = PotSized(table, me, 1, 2, min, max);
+        if (ImGui.SmallButton("Half")) _raiseTo = PotSized(table, me, 1, 2, min, max);
+        Ui.Tip("Raise by half the pot.");
         ImGui.SameLine();
         if (ImGui.SmallButton("Pot")) _raiseTo = PotSized(table, me, 1, 1, min, max);
         ImGui.SameLine();

@@ -58,13 +58,14 @@ public sealed class BlackjackModule : IGameModule
         Type: Type,
         DisplayName: "Blackjack",
         Blurb: "Beat the dealer to 21 without going over. Most chips after the last round wins.",
+        Rules: BlackjackRules.Sections,
         MinPlayers: BlackjackGame.MinPlayers,
         MaxPlayers: BlackjackGame.MaxPlayers,
         Options:
         [
-            new GameOption(ChipsKey, "Starting chips", 100, 5000, 500),
-            new GameOption(RoundsKey, "Rounds", 3, 30, 10),
-            new GameOption(MinBetKey, "Minimum bet", 5, 100, 10),
+            new GameOption(ChipsKey, "Starting chips", 100, 5000, 500, "How many chips each player starts with. The default is 500."),
+            new GameOption(RoundsKey, "Rounds", 3, 30, 10, "How many rounds are dealt before the game ends. The default is 10."),
+            new GameOption(MinBetKey, "Minimum bet", 5, 100, 10, "The smallest bet anyone can place, and a player who can't cover it is out. The default is 10."),
         ],
         Messages:
         [
