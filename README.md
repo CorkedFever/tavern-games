@@ -98,8 +98,8 @@ dotnet run --project src/TavernGames.Server -c Release
 ```
 
 Environment knobs: `TAVERN_MAX_ROOMS` (default 200) caps concurrent rooms;
-`TAVERN_BOT_DELAY_MS` overrides bot pacing (tests set it to 0). See `deploy/` for
-running it in Docker behind Caddy.
+`TAVERN_BOT_DELAY_MS` overrides bot pacing (tests set it to 0). The tavern's own relay runs on meteor
+behind `tavern-games.corkedfever.com/party`; `deploy/` has its compose file and how to update it.
 
 ## Play offline (no server)
 

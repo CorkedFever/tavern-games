@@ -1,39 +1,37 @@
-# Runs the relay + Caddy (reverse proxy with automatic HTTPS) together.
-# From the repo's deploy/ folder on the droplet:  docker compose up -d --build
+# The Tavern Games relay on meteor. Lives at /opt/tavern-games.
+#
+#   docker compose pull && docker compose up -d
+#
+# TLS and routing are not part of this stack. Caddy lives in corkedfever-website's
+# deploy/meteor (/opt/corkedfever), which owns the box's front door for every site on it and
+# creates the `corkedfever` network. The relay joins that network so Caddy reaches it by
+# container name: tavern-games.corkedfever.com/party/* goes to tavern-relay:5050 with the
+# /party prefix stripped, so players connect to wss://tavern-games.corkedfever.com/party/ws.
+# Start corkedfever's stack first: this one expects its network to exist.
+#
+# The image is built by GitHub Actions (.github/workflows/relay-image.yml), never on the box.
 
 services:
   relay:
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile
-    image: tavern-relay
+    image: ghcr.io/corkedfever/tavern-relay:latest
+    container_name: tavern-relay
     restart: unless-stopped
     environment:
       - ASPNETCORE_URLS=http://0.0.0.0:5050
-      # Optional knobs:
-      # - TAVERN_MAX_ROOMS=200       # cap concurrent rooms (abuse protection)
+      - Tavern__DbPath=/app/tavern-data/tavern.db
+      # Optional: cap concurrent rooms (abuse protection). The server defaults to 200.
+      # - TAVERN_MAX_ROOMS=200
     volumes:
-      - tavern_data:/app/tavern-data       # profiles, venues and leaderboards (SQLite) survive rebuilds
-    networks: [web]
-    # No host ports published — only Caddy is exposed to the internet.
-
-  caddy:
-    image: caddy:2
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data       # persists issued TLS certificates
-      - caddy_config:/config
-    networks: [web]
-    depends_on: [relay]
+      # Profiles, venues and leaderboards (SQLite). Must survive restarts and image updates.
+      - tavern_data:/app/tavern-data
+    # The box shares about 450 MB with Aetherstream's services; .NET sizes its heap to this.
+    mem_limit: 256m
+    networks: [corkedfever]
+    # No host ports: only Caddy, across the corkedfever network, ever reaches it.
 
 networks:
-  web:
+  corkedfever:
+    external: true
 
 volumes:
   tavern_data:
-  caddy_data:
-  caddy_config:

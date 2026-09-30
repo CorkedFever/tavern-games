@@ -1,90 +1,92 @@
-# Deploying the Liar's Dice relay to a DigitalOcean droplet
+# The relay on meteor
 
-This hosts the relay 24/7 behind Caddy (automatic HTTPS), so players connect to
-`wss://liarsdice.<yourdomain>/ws` and your home IP is never involved. Caddy is set
-up so you can host **other apps** on the same droplet later with ~3 extra lines.
+The Tavern Games relay runs on meteor, the same box as Aetherstream's services, in its own
+compose stack at `/opt/tavern-games`. Players connect to:
 
-## 1. Buy a domain & plan the subdomain
-Register a domain (Namecheap, Porkbun, Cloudflare ~$10/yr). You'll use a subdomain
-for the relay, e.g. **`liarsdice.yourdomain.com`**.
+```
+wss://tavern-games.corkedfever.com/party/ws
+```
 
-## 2. Create the droplet
-- DigitalOcean → **Create → Droplet**
-- **Ubuntu 24.04 LTS**, **Basic / Regular, 2 GB RAM** ($12/mo)
-- **Authentication: SSH key** (add yours; avoid password login)
-- Create, and note the droplet's **public IP**.
+which is the plugin's default server.
 
-## 3. Point DNS at the droplet
-At your domain registrar, add an **A record**:
-| Type | Host | Value |
+## How it fits together
+
+- **Caddy is not ours.** Meteor's Caddy belongs to corkedfever-website
+  (`deploy/meteor/caddy/Caddyfile`, running at `/opt/corkedfever`). It owns ports 80 and 443,
+  holds the certificates, and creates the `corkedfever` Docker network. Its
+  `tavern-games.corkedfever.com` block sends `/party/*` to `tavern-relay:5050` with the `/party`
+  prefix stripped, and everything else to the page on GitHub Pages. Route changes go through
+  that repo, not this one.
+- **The relay** is one container, `tavern-relay`, on the `corkedfever` network. It publishes no
+  host ports, so only Caddy can reach it. Its SQLite database (profiles, venues, leaderboards)
+  lives in the `tavern_data` volume and survives restarts and image updates.
+- **The image is built by GitHub Actions**, never on meteor, which has one vCPU and too little
+  free memory for a .NET SDK restore. `.github/workflows/relay-image.yml` runs the tests, then
+  publishes `ghcr.io/corkedfever/tavern-relay:latest` and a `:sha-<commit>` tag whenever the
+  server or the game rules change on `main`. The package is public, so meteor pulls it without
+  credentials.
+
+## First deploy
+
+From this repo, on a machine with the meteor SSH key. corkedfever's stack must already be up,
+since this one joins its network.
+
+```sh
+ssh -i ~/.ssh/meteor root@aetherstream.corkedfever.com "mkdir -p /opt/tavern-games"
+scp -i ~/.ssh/meteor deploy/docker-compose.yml root@aetherstream.corkedfever.com:/opt/tavern-games/docker-compose.yml
+ssh -i ~/.ssh/meteor root@aetherstream.corkedfever.com "cd /opt/tavern-games && docker compose pull && docker compose up -d"
+```
+
+Check it from inside the network before Caddy points at it:
+
+```sh
+ssh -i ~/.ssh/meteor root@aetherstream.corkedfever.com "docker run --rm --network corkedfever curlimages/curl -fsS http://tavern-relay:5050/health"
+```
+
+That prints `{"status":"ok"}`. Once corkedfever's Caddy has the `/party` route, the same check
+works from anywhere as `https://tavern-games.corkedfever.com/party/health`.
+
+## Updating
+
+Push to `main`; the workflow publishes a new `:latest`. Then:
+
+```sh
+ssh -i ~/.ssh/meteor root@aetherstream.corkedfever.com "cd /opt/tavern-games && docker compose pull && docker compose up -d"
+```
+
+To go back to an earlier build, set the compose file's image to that build's `:sha-<commit>`
+tag and run the same command.
+
+## Watching it
+
+```sh
+ssh -i ~/.ssh/meteor root@aetherstream.corkedfever.com "docker logs --tail 100 -f tavern-relay"
+```
+
+## Knobs
+
+Set in `docker-compose.yml` under `environment`:
+
+| Variable | Default | What it does |
 |---|---|---|
-| A | `liarsdice` | `<droplet IP>` |
+| `TAVERN_MAX_ROOMS` | 200 | Caps concurrent rooms. Empty rooms are freed on their own. |
+| `Tavern__DbPath` | `/app/tavern-data/tavern.db` | Where the database lives. Keep it inside the volume. |
 
-(Optional: an A record for `*` (wildcard) → the IP, so future subdomains just work.)
-DNS can take a few minutes to propagate.
+The container is limited to 256 MB (`mem_limit`), which .NET sizes its heap to. The box shares
+its memory with Aetherstream's services.
 
-## 4. SSH in and install Docker
+## Backups
+
+Everything the server knows is the one SQLite file in the `tavern_data` volume. To copy it off
+the box:
+
 ```sh
-ssh root@<droplet IP>
-
-# Docker + compose plugin
-curl -fsSL https://get.docker.com | sh
-
-# Firewall: allow SSH + web only
-ufw allow OpenSSH
-ufw allow 80
-ufw allow 443
-ufw --force enable
+ssh -i ~/.ssh/meteor root@aetherstream.corkedfever.com "docker cp tavern-relay:/app/tavern-data/tavern.db /root/tavern-backup.db"
+scp -i ~/.ssh/meteor root@aetherstream.corkedfever.com:/root/tavern-backup.db .
 ```
 
-## 5. Get the code and set your domain
-```sh
-git clone <your repo url> liarsdice
-cd liarsdice/deploy
+## Running your own relay elsewhere
 
-# Put your real subdomain in the Caddyfile (replace liarsdice.example.com)
-nano Caddyfile
-```
-
-## 6. Launch
-```sh
-docker compose up -d --build
-```
-First run builds the image and Caddy fetches a TLS certificate (needs DNS from
-step 3 to be live). Check it:
-```sh
-docker compose ps
-docker compose logs -f caddy     # watch for the cert being issued
-curl https://liarsdice.yourdomain.com/health   # -> {"status":"ok"}
-```
-
-## 7. Point the plugin at it
-In the Liar's Dice window, set **Server** to:
-```
-wss://liarsdice.yourdomain.com/ws
-```
-Connect, create a room, and share the room code with friends (they set the same
-server URL). Done — no tunnel, no home IP, always on.
-
-## Updating after code changes
-```sh
-cd liarsdice && git pull
-cd deploy && docker compose up -d --build
-```
-
-## Adding another app later
-1. Add its service to `docker-compose.yml` on the `web` network (no published ports).
-2. Add a block to the `Caddyfile`:
-   ```
-   myapp.yourdomain.com {
-       reverse_proxy myapp:PORT
-   }
-   ```
-3. Add the DNS A record for `myapp`, then `docker compose up -d`.
-
-## Notes / hardening
-- Rooms are capped (`TAVERN_MAX_ROOMS`, default 200) and empty rooms are freed
-  automatically. There's no account system — anyone with the URL can create rooms,
-  which is fine for casual play. Room codes are 4 characters.
-- Consider creating a non-root user and disabling root SSH for extra safety.
-- `docker compose logs -f relay` shows connection activity.
+The server needs nothing but the .NET 10 runtime, or this image. `dotnet run --project
+src/TavernGames.Server -c Release` serves `ws://localhost:5050/ws`; players point the plugin's
+Setup at whatever address your own proxy gives it.
