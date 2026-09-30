@@ -55,7 +55,7 @@ public sealed class GameClient(IPluginLog log) : IDisposable
 
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme is not ("ws" or "wss"))
         {
-            LastError = "Invalid server URL. Expected ws://host:port/path.";
+            LastError = $"Invalid server address. Expected wss://host/path, like {Configuration.DefaultServerUrl}.";
             State = ConnectionState.Disconnected;
             return;
         }

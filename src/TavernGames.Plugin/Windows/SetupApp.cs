@@ -21,16 +21,16 @@ internal sealed class SetupApp(Plugin plugin)
         }
 
         Theme.Heading("Server");
-        Ui.Hint("Playing against bots needs no server. A server is for playing with other people: tables with codes, venues and leaderboards.");
+        Ui.Hint("Playing against bots needs no server. The tavern's own server is for playing with other people: tables with codes, venues and leaderboards. It's set already; press Connect.");
 
         var online = client.State == ConnectionState.Connected && !client.IsLocal;
         var connecting = client.State == ConnectionState.Connecting;
 
         ImGui.SetNextItemWidth(300f);
         ImGui.BeginDisabled(online || connecting);
-        var submitted = ImGui.InputTextWithHint("##server", "ws://host:port/ws", ref _serverUrl, 256, ImGuiInputTextFlags.EnterReturnsTrue);
+        var submitted = ImGui.InputTextWithHint("##server", "wss://host/path", ref _serverUrl, 256, ImGuiInputTextFlags.EnterReturnsTrue);
         ImGui.EndDisabled();
-        Ui.Tip("The relay's WebSocket address.");
+        Ui.Tip("The relay's WebSocket address. Leave it on the tavern's server unless you run your own relay.");
 
         ImGui.SameLine();
         if (online)
@@ -62,6 +62,13 @@ internal sealed class SetupApp(Plugin plugin)
 
         if (client.LastError is { } error && client.State == ConnectionState.Disconnected)
             ImGui.TextColored(Theme.Bad, Ui.Ellipsis(error, 90));
+
+        if (!online && !connecting && _serverUrl.Trim() != Configuration.DefaultServerUrl)
+        {
+            if (ImGui.SmallButton("Use the tavern's server"))
+                _serverUrl = Configuration.DefaultServerUrl;
+            Ui.Tip(Configuration.DefaultServerUrl);
+        }
 
         Ui.Hint("The first time you connect, the server gives this install a profile it will recognise again. There is no account and no password.");
 

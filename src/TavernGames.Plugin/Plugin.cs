@@ -55,6 +55,8 @@ public sealed class Plugin : IDalamudPlugin
             log.Information("Tavern Games: constructor start");
 
             Config = pluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+            if (Config.Migrate())
+                Config.Save();
             Client = new GameClient(log);
             Theme.DisplayFace = new DisplayFont(pluginInterface, log);
             Sound.Directory = Path.Combine(pluginInterface.ConfigDirectory.FullName, "Sounds");
