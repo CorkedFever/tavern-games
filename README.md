@@ -112,9 +112,14 @@ leaderboards are server-only and simply don't appear in solo play.
 
 ## Use the plugin
 
-1. In `/xlsettings` → Experimental → Dev Plugin Locations, add
-   `src/TavernGames.Plugin/bin/Release/TavernGames.dll`, then enable it in `/xlplugins`.
+1. In `/xlsettings` → Experimental → Custom Plugin Repositories, add
+   `https://raw.githubusercontent.com/CorkedFever/tavern-games/main/repo.json` and save, then
+   install **Tavern Games** from `/xlplugins`. (Building from source instead: add
+   `src/TavernGames.Plugin/bin/Release/TavernGames.dll` under Dev Plugin Locations.)
 2. In game, run `/tavern`.
+
+The page at [tavern-games.corkedfever.com](https://tavern-games.corkedfever.com/) has the same
+steps and the games; it is `docs/index.html`, served by GitHub Pages.
 
 ### The window
 

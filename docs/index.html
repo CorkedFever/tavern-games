@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tavern Games</title>
+<meta name="description" content="A table of tavern games in your Final Fantasy XIV window: Liar's Dice, Pig, Mia, Blackjack, Texas Hold'em, Roulette, and Ship, Captain and Crew. Play against bots, or open a table and hand friends a four-letter code.">
+<meta property="og:title" content="Tavern Games">
+<meta property="og:description" content="A table in the tavern. Pull up a chair.">
+<meta property="og:image" content="https://raw.githubusercontent.com/CorkedFever/tavern-games/main/src/TavernGames.Plugin/images/icon.png">
+<meta property="og:url" content="https://tavern-games.corkedfever.com/">
+<link rel="canonical" href="https://tavern-games.corkedfever.com/">
+<link rel="icon" href="https://raw.githubusercontent.com/CorkedFever/tavern-games/main/src/TavernGames.Plugin/images/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: the same page shape as aetherstream.corkedfever.com, in the plugin's own palette: a near-black shell, warm glass panels, a green felt, one lantern-amber accent. Single dark look by choice. */
+:root {
+  --shell: #0B0B10;
+  --panel: #100E0A;
+  --panel-lit: #231A0C;
+  --felt: #0E2118;
+  --felt-edge: #1A3A2A;
+  --rail: #1C140B;
+  --edge: #2C2618;
+  --seam: #2A2A34;
+  --frame: #4A4A60;
+  --text: #F3ECDF;
+  --dim: #B8AC98;
+  --faint: #8A8070;
+  --accent: #F0B650;
+  --good: #5DCAA5;
+  --bad: #E24B4A;
+  --ivory: #F5F0DE;
+  --crimson: #6B2629;
+  --display: "VT323", "Courier New", monospace;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { animation: none !important; transition: none !important; } }
+body { margin: 0; background: var(--shell); color: var(--text); font-family: var(--body); font-size: 16px; line-height: 1.65; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 1000px; margin: 0 auto; padding: 0 24px; }
+header { border-bottom: 1px solid var(--seam); background: #15151DCC; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; backdrop-filter: blur(6px); }
+.bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 24px; max-width: 1000px; margin: 0 auto; }
+.bar svg { flex: none; }
+.bar .name { font-family: var(--display); font-size: 26px; letter-spacing: 2px; color: var(--text); }
+.bar nav { margin-left: auto; display: flex; gap: 22px; font-size: 14px; }
+.bar nav a { color: var(--dim); }
+.bar nav a:hover { color: var(--accent); text-decoration: none; }
+.hero { display: flex; align-items: center; gap: 48px; flex-wrap: wrap; padding: 64px 0 56px; }
+.hero .mark { flex: none; }
+.hero .copy { flex: 1 1 380px; min-width: 0; }
+.hero h1 { font-family: var(--display); font-weight: 400; font-size: clamp(54px, 10vw, 104px); line-height: 0.9; letter-spacing: 3px; margin: 0; text-wrap: balance; }
+.hero .tagline { font-family: var(--display); font-size: clamp(20px, 3vw, 27px); letter-spacing: 5px; color: var(--accent); margin: 10px 0 18px; }
+.hero p { max-width: 58ch; color: var(--dim); margin: 0 0 26px; }
+.cta { display: flex; gap: 14px; flex-wrap: wrap; }
+.btn { display: inline-block; font-family: var(--display); font-size: 21px; letter-spacing: 2px; padding: 6px 22px 5px; border-radius: 4px; border: 1px solid var(--edge); background: var(--panel); color: var(--text); }
+.btn:hover { background: var(--panel-lit); border-color: var(--accent); text-decoration: none; }
+.btn.lit { background: var(--panel-lit); border-color: var(--accent); color: var(--accent); }
+@keyframes pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+.led { animation: pulse 2.4s ease-in-out infinite; }
+section { padding: 46px 0; border-top: 1px solid var(--seam); }
+h2 { font-family: var(--display); font-weight: 400; font-size: 34px; letter-spacing: 3px; color: var(--accent); margin: 0 0 6px; }
+h2::before { content: "// "; color: var(--faint); }
+.lede { color: var(--dim); max-width: 62ch; margin: 0 0 28px; }
+.tables { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 16px; }
+.tb { background: var(--panel); border: 1px solid var(--edge); border-top: 3px solid var(--accent); border-radius: 6px; padding: 16px 20px 18px; min-width: 0; }
+.tb .no { font-family: var(--display); font-size: 20px; color: var(--faint); letter-spacing: 1px; }
+.tb h3 { font-family: var(--display); font-weight: 400; font-size: 34px; line-height: 1; letter-spacing: 2px; margin: 8px 0 2px; color: var(--accent); }
+.tb .seats { font-family: var(--mono); font-size: 12.5px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.5px; }
+.tb p { font-size: 14.5px; color: var(--dim); margin: 10px 0 0; }
+.steps { display: grid; gap: 14px; counter-reset: step; }
+.step { display: flex; gap: 18px; background: var(--panel); border: 1px solid var(--edge); border-radius: 6px; padding: 16px 20px; min-width: 0; }
+.step::before { counter-increment: step; content: counter(step); flex: none; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--accent); color: var(--accent); font-family: var(--display); font-size: 26px; display: flex; align-items: center; justify-content: center; }
+.step > div { min-width: 0; }
+.step h3 { font-size: 16px; font-weight: 600; margin: 4px 0 6px; }
+.step p { font-size: 14.5px; color: var(--dim); margin: 0; }
+kbd { font-family: var(--mono); font-size: 13px; background: #060A12; border: 1px solid var(--edge); border-radius: 3px; padding: 1px 6px; color: var(--text); }
+.code { display: flex; align-items: center; gap: 10px; margin-top: 10px; background: #060A12; border: 1px solid var(--edge); border-radius: 4px; padding: 8px 10px; font-family: var(--mono); font-size: 13px; overflow-x: auto; }
+.code span { flex: 1; min-width: 0; white-space: nowrap; color: var(--text); }
+.code button { flex: none; font-family: var(--display); font-size: 17px; letter-spacing: 1px; background: var(--panel); border: 1px solid var(--edge); color: var(--dim); border-radius: 3px; padding: 2px 10px 1px; cursor: pointer; }
+.code button:hover { border-color: var(--accent); color: var(--accent); }
+.window { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 14px; margin-top: 8px; }
+.note { background: var(--panel); border: 1px solid var(--edge); border-radius: 6px; padding: 16px 18px; min-width: 0; }
+.note h3 { font-size: 16px; font-weight: 600; margin: 0 0 6px; }
+.note p { font-size: 14.5px; color: var(--dim); margin: 0; }
+.felt-demo { background: var(--felt); border: 6px solid var(--rail); border-radius: 22px; box-shadow: inset 0 0 0 1px var(--felt-edge); padding: 18px 20px; display: flex; flex-wrap: wrap; gap: 18px; align-items: center; justify-content: center; margin: 22px 0 6px; }
+.felt-demo .word { font-family: var(--display); font-size: 40px; letter-spacing: 3px; color: var(--accent); }
+.felt-demo .word.bad { color: var(--bad); }
+.felt-demo .word.good { color: var(--good); }
+.legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px 24px; margin-top: 18px; font-size: 14.5px; color: var(--dim); }
+.legend b { font-family: var(--display); font-weight: 400; font-size: 21px; letter-spacing: 2px; color: var(--text); display: block; }
+.legend b.a { color: var(--accent); } .legend b.g { color: var(--good); } .legend b.r { color: var(--bad); }
+footer { border-top: 1px solid var(--seam); padding: 30px 0 40px; color: var(--faint); font-size: 13.5px; }
+footer .wrap { display: flex; gap: 8px 20px; flex-wrap: wrap; align-items: baseline; }
+footer .on { color: var(--good); font-family: var(--display); font-size: 17px; letter-spacing: 1px; }
+@media (max-width: 620px) { .wrap, .bar { padding-left: 16px; padding-right: 16px; } .bar nav { margin-left: 0; width: 100%; gap: 18px; } .hero { padding: 40px 0; gap: 28px; } .hero .mark { width: 200px; height: auto; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <g id="dicemark">
+      <rect x="4" y="4" width="232" height="232" rx="42" fill="#0B0B10" stroke="#4A4A60" stroke-width="2"/>
+      <circle cx="120" cy="126" r="88" fill="#1C140B"/>
+      <circle cx="120" cy="126" r="79" fill="#0E2118" stroke="#1A3A2A" stroke-width="1.5"/>
+      <g transform="rotate(14 146 110)"><rect x="112" y="76" width="68" height="68" rx="12" fill="#6B2629" stroke="#A85252" stroke-width="3"/><rect x="138" y="102" width="16" height="16" fill="#FFFFFF" opacity="0.22" transform="rotate(45 146 110)"/></g>
+      <g transform="rotate(-12 106 138)"><rect x="62" y="94" width="88" height="88" rx="15" fill="#F5F0DE" stroke="#F0B650" stroke-width="4"/>
+        <circle cx="84" cy="116" r="7" fill="#211C19"/><circle cx="128" cy="116" r="7" fill="#211C19"/><circle cx="106" cy="138" r="7" fill="#211C19"/><circle cx="84" cy="160" r="7" fill="#211C19"/><circle cx="128" cy="160" r="7" fill="#211C19"/></g>
+    </g>
+  </defs>
+</svg>
+
+<header>
+  <div class="bar">
+    <svg width="34" height="34" viewBox="0 0 240 240" aria-hidden="true"><use href="#dicemark"/></svg>
+    <span class="name">TAVERN GAMES</span>
+    <nav aria-label="Sections">
+      <a href="#games">The games</a>
+      <a href="#install">Install</a>
+      <a href="#window">The window</a>
+      <a href="#others">With others</a>
+      <a href="https://github.com/CorkedFever/tavern-games">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="hero">
+    <svg class="mark" width="240" height="240" viewBox="0 0 240 240" role="img" aria-label="An ivory die with an amber rim and a crimson die face down, on a green felt table"><use href="#dicemark"/></svg>
+    <div class="copy">
+      <h1>A TABLE IN THE TAVERN</h1>
+      <div class="tagline">PULL UP A CHAIR.</div>
+      <p>
+        Tavern Games is a Dalamud plugin that puts a table of tavern games in your Final Fantasy XIV window.
+        Liar's Dice, Pig, Mia, Blackjack, Texas Hold'em, Roulette, and Ship, Captain and Crew. Play against bots on
+        your own, or open a table and hand friends a four-letter code. Venues host tables for their members and keep
+        a leaderboard. Wagers are flavour: the plugin never touches gil.
+      </p>
+      <div class="cta">
+        <a class="btn lit" href="#install">INSTALL</a>
+        <a class="btn" href="https://github.com/CorkedFever/tavern-games">SOURCE</a>
+      </div>
+    </div>
+  </div>
+
+  <section id="games">
+    <h2>THE GAMES</h2>
+    <div class="tables">
+      <div class="tb"><div class="no">TABLE 1</div><h3>Liar's Dice</h3><div class="seats">2 to 6 seats</div>
+        <p>Everyone rolls under a cup. Raise the bid, or call liar and every cup comes off. Lose a die when you're wrong; the last one with dice wins.</p></div>
+      <div class="tb"><div class="no">TABLE 2</div><h3>Pig</h3><div class="seats">2 to 6 seats</div>
+        <p>Roll one die as often as you dare and bank the pot when your nerve goes. A one loses the lot. First to the target wins.</p></div>
+      <div class="tb"><div class="no">TABLE 3</div><h3>Mia</h3><div class="seats">2 to 6 seats</div>
+        <p>Two dice under a cup only you can see, and a number you announce that has to beat the last one. Truthfully or otherwise. Twenty-one is Mia and beats everything.</p></div>
+      <div class="tb"><div class="no">TABLE 4</div><h3>Blackjack</h3><div class="seats">1 to 5 seats and the house</div>
+        <p>Beat the dealer to twenty-one. Hit, stand or double down; the dealer draws to seventeen. Biggest stack after the last round wins.</p></div>
+      <div class="tb"><div class="no">TABLE 5</div><h3>Texas Hold'em</h3><div class="seats">2 to 6 seats</div>
+        <p>A no-limit sit-and-go. Two cards each, five on the board, blinds that climb, side pots that pay only what each seat covered. Play until one seat holds every chip.</p></div>
+      <div class="tb"><div class="no">TABLE 6</div><h3>Roulette</h3><div class="seats">1 to 6 seats and the house</div>
+        <p>Chips on the layout, the wheel turns, the ball lands where the server said it would. Straight numbers pay thirty-five to one; a zero takes every outside bet.</p></div>
+      <div class="tb"><div class="no">TABLE 7</div><h3>Ship, Captain and Crew</h3><div class="seats">2 to 6 seats</div>
+        <p>Five dice, three throws. A six, then a five, then a four, in that order, and the other two dice are your cargo. Best cargo takes the round.</p></div>
+    </div>
+  </section>
+
+  <section id="install">
+    <h2>INSTALL</h2>
+    <p class="lede">It installs through Dalamud's plugin installer like any other plugin. Two minutes.</p>
+    <div class="steps">
+      <div class="step"><div>
+        <h3>Add the repository</h3>
+        <p>In game, open Dalamud settings (<kbd>/xlsettings</kbd>), go to <strong>Experimental</strong>, then <strong>Custom Plugin Repositories</strong>. Paste this, press the plus, and save.</p>
+        <div class="code"><span>https://raw.githubusercontent.com/CorkedFever/tavern-games/main/repo.json</span><button type="button" id="copy-repo" data-copy="https://raw.githubusercontent.com/CorkedFever/tavern-games/main/repo.json">COPY</button></div>
+      </div></div>
+      <div class="step"><div>
+        <h3>Install the plugin</h3>
+        <p>Open the plugin installer (<kbd>/xlplugins</kbd>), search for <strong>Tavern Games</strong>, install it.</p>
+      </div></div>
+      <div class="step"><div>
+        <h3>Sit down</h3>
+        <p><kbd>/tavern</kbd> opens the window. Pick a game, press <strong>Play vs bots</strong>, and you're dealt in. No server, no account.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <section id="window">
+    <h2>THE WINDOW</h2>
+    <p class="lede">Your seat on the left, the table beside it. The felt shows what everyone sees; your seat shows what only you see.</p>
+    <div class="felt-demo" aria-label="What the felt says">
+      <span class="word">YOUR TURN</span>
+      <span class="word bad">LIAR!</span>
+      <span class="word good">THE BID HELD</span>
+      <span class="word">POT 260</span>
+      <span class="word good">VICTORY</span>
+    </div>
+    <div class="window">
+      <div class="note"><h3>Your seat</h3><p>A display strip that says what the table wants of you, your name, your dice or your cards, and the keys for what you can do. It never moves.</p></div>
+      <div class="note"><h3>The felt</h3><p>A plate for every seat, lit for whoever is on the clock, and the middle of the table: the standing bid, the pot and board, the wheel.</p></div>
+      <div class="note"><h3>Fold it</h3><p>Press the <kbd>_</kbd> in the title bar and only your seat stays, so a game can be played from a corner of the screen while the roleplay carries on. Setup can fold it for you when a game starts.</p></div>
+      <div class="note"><h3>Staged, not logged</h3><p>Dice tumble, cards are dealt and turned, chips fly to the winner, a call stamps the felt, and the end of a game is confetti or a red flush. Sounds are the plugin's own; both can be switched off.</p></div>
+    </div>
+  </section>
+
+  <section id="others">
+    <h2>WITH OTHERS</h2>
+    <p class="lede">Playing alone needs nothing. Playing with people needs a server, and the tavern runs one.</p>
+    <div class="steps">
+      <div class="step"><div>
+        <h3>Connect</h3>
+        <p>Under <strong>Setup</strong>, connect to the tavern's server. The first time, the server gives your install a profile it will recognise again. No account, no password.</p>
+      </div></div>
+      <div class="step"><div>
+        <h3>Open a table, or join one</h3>
+        <p>A table gets a four-letter code. Friends enter it under <strong>Join a code</strong> to sit down, or watch from the rail. The server rolls every die and deals every card, and tells each seat only what that seat may see, so a tampered client cannot cheat.</p>
+      </div></div>
+      <div class="step"><div>
+        <h3>Venues</h3>
+        <p>Anyone with a profile can start a venue and hand out its join code. Staff host tables for it, members find those tables on the venue's page, and every finished game counts on its leaderboard. Games against bots don't.</p>
+      </div></div>
+    </div>
+    <div class="legend">
+      <div><b class="a">YOUR TURN</b> The table is waiting on you. Your seat lights amber and a chime plays.</div>
+      <div><b class="g">THE BID HELD</b> Green is good news. A win, a hand taken, a claim that stood.</div>
+      <div><b class="r">LIAR!</b> Red is the accusation, the bust, the house winning. Your seat flashes red.</div>
+      <div><b>WAITING</b> Someone else is on the clock. Fold the window and let them.</div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span class="on">● OPEN</span>
+    <span>Tavern Games by <a href="https://corkedfever.com/">CorkedFever</a>. A fan project. Like every Dalamud plugin, it is a third-party tool and using it is against the FFXIV Terms of Service.</span>
+    <span><a href="https://github.com/CorkedFever/tavern-games">Source on GitHub</a></span>
+  </div>
+</footer>
+
+<script>
+  document.querySelectorAll('button[data-copy]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      var text = button.getAttribute('data-copy');
+      var done = function () { button.textContent = 'COPIED'; setTimeout(function () { button.textContent = 'COPY'; }, 1600); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, function () { select(); });
+      } else { select(); }
+      function select() {
+        var span = button.previousElementSibling; var range = document.createRange(); range.selectNodeContents(span);
+        var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+      }
+    });
+  });
+</script>
+</body>
+</html>
